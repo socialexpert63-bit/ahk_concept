@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 84" role="img" aria-label="AHK Group logo">
+  <g transform="translate(4 8)">
+    <circle cx="34" cy="34" r="32" fill="#0B1530" stroke="#C9A961" stroke-width="1.6"/>
+    <g transform="translate(2 2)">
+      <rect x="18" y="18" width="28" height="28" fill="none" stroke="#C9A961" stroke-width="1.4"/>
+      <rect x="18" y="18" width="28" height="28" fill="none" stroke="#C9A961" stroke-width="1.4" transform="rotate(45 32 32)"/>
+      <path d="M26 43V33a6 6 0 0 1 12 0v10M26 38h12" fill="none" stroke="#F3E7C4" stroke-width="2" stroke-linecap="round"/>
+    </g>
+  </g>
+  <text x="90" y="52" font-family="'Cormorant Garamond',Georgia,'Times New Roman',serif" font-size="46" font-weight="700" letter-spacing="3" fill="#0B1530">AHK</text>
+  <text x="92" y="72" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="600" letter-spacing="4.5" fill="#9A7B35">GROUP · SINCE 1998</text>
+</svg>

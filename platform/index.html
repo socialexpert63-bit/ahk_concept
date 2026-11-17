@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AHK Hospitality Intelligence</title>
+<link rel="icon" href="../assets/ahk-logo.svg" type="image/svg+xml">
+</head>
+<body>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: fixed navy sidebar + ivory workspace; cards on ivory; gold used for accents only, emerald for positive state */
+:root{
+  --side:#0B1530; --side2:#142252; --gold:#C9A961; --gold-ink:#7A6128; --emerald:#1F8A6B;
+  --bg:#F5F1E7; --card:#FFFDF8; --fg:#14213D; --mut:#5C6782; --line:#E3DCC9; --soft:#EFE9D9;
+  --warn:#A8690F; --crit:#B3363E; --ok:#1F8A6B; --chart-grid:rgba(20,33,61,.08);
+  --head:'Cormorant Garamond',Georgia,serif; --body:'Inter',system-ui,sans-serif;
+  --pad-l:max(16px,env(safe-area-inset-left,0px)); --pad-r:max(16px,env(safe-area-inset-right,0px));
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --side:#070D1F; --side2:#101B3D; --gold:#D6B876; --gold-ink:#D6B876; --emerald:#3CB58F;
+  --bg:#0A1226; --card:#101B38; --fg:#EDE8DA; --mut:#9AA6C2; --line:#223056; --soft:#16234A;
+  --warn:#E0A33C; --crit:#E2707A; --ok:#3CB58F; --chart-grid:rgba(237,232,218,.09); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --side:#070D1F; --side2:#101B3D; --gold:#D6B876; --gold-ink:#D6B876; --emerald:#3CB58F;
+  --bg:#0A1226; --card:#101B38; --fg:#EDE8DA; --mut:#9AA6C2; --line:#223056; --soft:#16234A;
+  --warn:#E0A33C; --crit:#E2707A; --ok:#3CB58F; --chart-grid:rgba(237,232,218,.09); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.5;padding-left:var(--pad-l);padding-right:var(--pad-r);overflow-x:hidden}
+h1,h2,h3{font-family:var(--head);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.2px}
+h1{font-size:30px;line-height:1.15} h2{font-size:22px} h3{font-size:18px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.mut{color:var(--mut)} .tiny{font-size:12px} .num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-ink);font-weight:600}
+
+/* automation */
+.flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:12px 0 8px}
+.node{font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--soft);min-width:0}
+.node.t{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 16%,transparent)}
+.node.c{border-style:dashed} .node.a{border-color:var(--emerald)}
+.arr{color:var(--gold-ink)}
+.step{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);animation:rise .3s both}
+.step i{font-style:normal;color:var(--ok)}
+.sl{width:100%;accent-color:var(--gold)}
+.cmd{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);margin-bottom:10px}
+.cmdi{display:flex;justify-content:space-between;width:100%;text-align:left;background:none;border:0;padding:10px 8px;border-bottom:1px solid var(--line);border-radius:6px}
+.cmdi:hover,.cmdi:focus-visible{background:var(--soft)}
+a.ico{text-decoration:none;color:inherit;font-size:13px}
+.lg{width:38px;height:38px;flex:none}
+
+/* login + onboarding */
+#login,#onboard{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(1200px 600px at 20% 0%,#1B2E6B 0%,var(--side) 60%);padding:20px;color:#EDE8DA}
+.login-card{width:min(420px,100%);background:rgba(255,255,255,.06);border:1px solid rgba(214,184,118,.35);border-radius:16px;padding:32px;backdrop-filter:blur(14px)}
+.login-card h1{font-size:36px;color:#F3E7C4}
+.login-card label{display:block;font-size:12px;margin:16px 0 6px;color:#B9C2DA}
+.login-card input{width:100%;padding:11px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff}
+.btn{border:0;border-radius:8px;padding:10px 16px;font-weight:600;transition:transform .15s,box-shadow .15s,background .15s}
+.btn:hover{transform:translateY(-1px)} .btn:active{transform:translateY(0)}
+.btn.gold{background:linear-gradient(135deg,#D9BE80,#B8923F);color:#14213D}
+.btn.gold:hover{box-shadow:0 6px 18px rgba(201,169,97,.35)}
+.btn.line{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.btn.line:hover{background:var(--soft)}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+#onboard{display:none;text-align:center}
+#onboard .ring{width:84px;height:84px;border-radius:50%;border:2px solid rgba(214,184,118,.25);border-top-color:#D6B876;margin:0 auto 22px;animation:spin 1.1s linear infinite}
+#onboard h1{font-size:40px;color:#F3E7C4;animation:rise .9s both}
+#onboard p{animation:rise .9s .35s both;color:#B9C2DA}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* shell */
+#app{display:none;min-height:100vh}
+#side{position:fixed;left:0;top:0;bottom:0;width:256px;background:linear-gradient(180deg,var(--side),var(--side2) 140%);color:#D8DEEE;padding:20px 12px;overflow-y:auto;z-index:50;transition:transform .25s}
+.brand{display:flex;gap:10px;align-items:center;padding:4px 10px 18px;border-bottom:1px solid rgba(214,184,118,.22);margin-bottom:12px}
+.mark{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#E3CB92,#B58F3E);color:#0B1530;display:grid;place-items:center;font-family:var(--head);font-weight:700;font-size:15px}
+.brand b{font-family:var(--head);font-size:19px;color:#F3E7C4;display:block;line-height:1.1}
+.brand span{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#93A0C4}
+#nav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:0;color:#C3CCE2;padding:9px 12px;border-radius:9px;font-size:13.5px;margin:1px 0;transition:background .2s,color .2s,padding .2s}
+#nav button:hover{background:rgba(255,255,255,.06);color:#fff;padding-left:15px}
+#nav button.on{background:rgba(214,184,118,.14);color:#F3E7C4;box-shadow:inset 3px 0 0 #D6B876}
+#nav svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.side-foot{margin-top:18px;padding:12px;border-radius:10px;border:1px solid rgba(214,184,118,.25);font-size:11.5px;color:#A9B4D2}
+#scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40}
+#wrap{margin-left:256px}
+#top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;padding:12px 0;flex-wrap:wrap}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--bg)}
+#burger{display:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.search{flex:1 1 220px;min-width:0;position:relative;max-width:420px}
+.search input{width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--card)}
+#sres{position:absolute;top:42px;left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.18);display:none;z-index:70;max-height:300px;overflow:auto}
+#sres button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 12px;border-bottom:1px solid var(--line)}
+#sres button:hover{background:var(--soft)}
+.tools{display:flex;gap:8px;align-items:center;margin-left:auto}
+.ico{position:relative;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:7px 10px}
+.dot{position:absolute;top:-4px;right:-4px;background:var(--crit);color:#fff;border-radius:99px;font-size:10px;padding:1px 5px}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--side2),var(--side));color:#F3E7C4;display:grid;place-items:center;font-weight:600;font-size:12px;border:1px solid var(--gold)}
+select{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+#panel{position:absolute;right:0;top:46px;width:min(340px,86vw);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.2);display:none;z-index:70}
+#panel.open{display:block;animation:rise .2s both}
+#panel div.item{padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px}
+main{padding:24px 0 60px;animation:rise .35s both}
+.pagehead{display:flex;gap:14px;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+.pagehead p{margin:4px 0 0;color:var(--mut)}
+.demo{display:inline-block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--gold);color:var(--gold-ink);border-radius:99px;padding:2px 9px}
+
+/* content primitives */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.g6{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}
+.g21{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+@media(max-width:1100px){.g21{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0}
+.card.hov{transition:transform .2s,box-shadow .2s,border-color .2s;cursor:pointer}
+.card.hov:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(11,21,48,.12);border-color:var(--gold)}
+.card h3{margin-bottom:10px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.kpi .v{font-family:var(--head);font-size:32px;font-weight:600;line-height:1.1;margin-top:6px}
+.kpi .d{font-size:12px;margin-top:4px}
+.up{color:var(--ok)} .down{color:var(--crit)}
+.chart{position:relative;height:260px}
+.chart.sm{height:200px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;border:1px solid transparent}
+.pill.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.pill.crit{background:color-mix(in srgb,var(--crit) 14%,transparent);color:var(--crit)}
+.pill.gold{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--gold-ink)}
+.pill.mut{background:var(--soft);color:var(--mut)}
+.bar{height:7px;border-radius:9px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,var(--emerald),var(--gold));transition:width 1s cubic-bezier(.2,.7,.2,1)}
+.tablewrap{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);cursor:default;white-space:nowrap}
+th.s{cursor:pointer} th.s:hover{color:var(--fg)}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--soft)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;padding:8px 13px;color:var(--mut);border-bottom:2px solid transparent;font-weight:500}
+.tabs button.on{color:var(--fg);border-color:var(--gold)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{background:var(--card);border:0;padding:6px 12px;font-size:12.5px;color:var(--mut)}
+.seg button.on{background:var(--side);color:#F3E7C4}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.filters input[type=text],.filters input[type=search],input.f,textarea.f,select.f{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-width:0}
+.list .row{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.list .row:last-child{border:0}
+.insight{border-radius:14px;padding:18px;color:#EDE8DA;background:linear-gradient(145deg,#0B1530,#1B2E6B);border:1px solid rgba(214,184,118,.4);position:relative;overflow:hidden}
+.insight::after{content:"";position:absolute;right:-60px;top:-60px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(214,184,118,.3),transparent 70%)}
+.insight h3{color:#F3E7C4} .insight .it{padding:10px 0;border-top:1px solid rgba(255,255,255,.12);font-size:13px;position:relative;z-index:1}
+.schematic{background:linear-gradient(160deg,var(--soft),var(--card));border:1px solid var(--line);border-radius:12px;position:relative;height:300px;overflow:hidden}
+.schematic svg{width:100%;height:100%;display:block}
+.pin{position:absolute;transform:translate(-50%,-50%);background:var(--side);color:#F3E7C4;border:1px solid var(--gold);border-radius:99px;padding:3px 9px;font-size:11px;white-space:nowrap;cursor:pointer;transition:transform .15s}
+.pin:hover{transform:translate(-50%,-50%) scale(1.08)}
+.pipe{display:grid;grid-template-columns:repeat(6,minmax(170px,1fr));gap:12px;overflow-x:auto;padding-bottom:6px}
+.pipe .col{background:var(--soft);border-radius:12px;padding:10px;min-height:120px}
+.pipe .col h4{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--mut)}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer;transition:transform .15s,border-color .15s}
+.pcard:hover{transform:translateY(-2px);border-color:var(--gold)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .h{font-size:11px;color:var(--mut);text-transform:uppercase;text-align:center;padding:4px}
+.cal .d{min-height:78px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px;font-size:11.5px;min-width:0;overflow:hidden}
+.cal .d.today{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.cal .d.off{opacity:.45}
+.ev{display:block;width:100%;text-align:left;border:0;border-radius:5px;padding:2px 5px;margin-top:3px;font-size:11px;background:color-mix(in srgb,var(--gold) 28%,transparent);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev:hover{background:var(--gold);color:#0B1530}
+.chat{display:flex;flex-direction:column;height:430px}
+.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 2px}
+.m{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13.5px}
+.m.u{align-self:flex-end;background:var(--side);color:#F3E7C4}
+.m.a{align-self:flex-start;background:var(--soft)}
+.typing i{display:inline-block;width:6px;height:6px;margin:0 2px;border-radius:50%;background:var(--mut);animation:blink 1s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{50%{opacity:.2;transform:translateY(-3px)}}
+.orb{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#F3E7C4,#C9A961 40%,#1B2E6B 85%);animation:pulse 3s ease-in-out infinite;flex:none}
+@keyframes pulse{50%{transform:scale(1.08);box-shadow:0 0 28px rgba(214,184,118,.6)}}
+.ai-dark{background:linear-gradient(160deg,#0A1226,#14224F);color:#EDE8DA;border:1px solid rgba(214,184,118,.35);border-radius:16px;padding:18px}
+.ai-dark .m.a{background:rgba(255,255,255,.08)} .ai-dark .m.u{background:#C9A961;color:#0B1530}
+.ai-dark input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff}
+.ai-dark .mut{color:#A9B4D2}
+.chip{background:rgba(255,255,255,.08);border:1px solid rgba(214,184,118,.4);color:#F3E7C4;border-radius:99px;padding:5px 11px;font-size:12px}
+.chip:hover{background:rgba(214,184,118,.25)}
+.skel{background:linear-gradient(90deg,var(--soft),var(--card),var(--soft));background-size:200% 100%;animation:sh 1.1s infinite;border-radius:12px;height:110px;margin-bottom:14px}
+@keyframes sh{to{background-position:-200% 0}}
+#modal{position:fixed;inset:0;background:rgba(5,10,25,.6);z-index:90;display:none;align-items:flex-start;justify-content:center;padding:max(20px,env(safe-area-inset-top,0px)) 14px 20px;overflow-y:auto}
+#modal.open{display:flex}
+#mbox{background:var(--bg);border:1px solid var(--gold);border-radius:16px;width:min(920px,100%);padding:22px;margin:auto 0;animation:rise .25s both}
+.mhead{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px;align-items:flex-start}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);background:var(--side);color:#F3E7C4;border:1px solid var(--gold);padding:10px 16px;border-radius:10px;opacity:0;transition:.25s;z-index:120;pointer-events:none;max-width:90vw}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.form label{display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
+.form input,.form select,.form textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.toggle{width:42px;height:24px;border-radius:99px;background:var(--line);border:0;position:relative;transition:.2s;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+.toggle.on{background:var(--emerald)} .toggle.on::after{left:21px}
+pre.csv{background:var(--soft);border-radius:10px;padding:12px;overflow:auto;max-height:220px;font-size:12px;white-space:pre}
+.gen{height:4px;background:var(--soft);border-radius:4px;overflow:hidden}
+.gen i{display:block;height:100%;width:0;background:var(--gold);transition:width 1.2s ease}
+@media(max-width:900px){
+  #side{transform:translateX(-100%)} #side.open{transform:none} #scrim.open{display:block}
+  #wrap{margin-left:0} #burger{display:block} h1{font-size:25px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<!-- LOGIN -->
+<div id="login">
+  <form class="login-card" id="loginform">
+    <svg viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="AHK Group logo" style="display:block;margin-bottom:14px"><circle cx="32" cy="32" r="30" fill="#0B1530" stroke="#C9A961" stroke-width="1.5"/><rect x="18" y="18" width="28" height="28" fill="none" stroke="#C9A961" stroke-width="1.4"/><rect x="18" y="18" width="28" height="28" fill="none" stroke="#C9A961" stroke-width="1.4" transform="rotate(45 32 32)"/><path d="M26 43V33a6 6 0 0 1 12 0v10M26 38h12" fill="none" stroke="#F3E7C4" stroke-width="2" stroke-linecap="round"/></svg>
+    <div class="eyebrow" style="color:#D6B876">Concept prototype for AHK Group</div>
+    <h1 style="margin-top:8px">AHK Hospitality Intelligence</h1>
+    <p style="color:#B9C2DA;margin:8px 0 0">A unified digital ecosystem for modern hospitality. All figures are demonstration data.</p>
+    <label for="lu">Executive email</label><input id="lu" type="email" value="chairman@demo.ahk">
+    <label for="lp">Passcode</label><input id="lp" type="password" value="demo-access">
+    <button class="btn gold" style="width:100%;margin-top:22px" type="submit">Enter the platform</button>
+    <p class="tiny" style="color:#93A0C4;margin:14px 0 0">Demo sign-in. No credentials are checked or stored.</p>
+  </form>
+</div>
+<div id="onboard"><div><div class="ring"></div><h1>Welcome back, Executive</h1><p>Preparing your portfolio overview…</p></div></div>
+
+<div id="app">
+  <aside id="side"><div class="brand" data-go="exec" style="cursor:pointer" title="Home"><svg class="lg" viewBox="0 0 64 64" role="img" aria-label="AHK Group logo"><circle cx="32" cy="32" r="30" fill="#0B1530" stroke="#C9A961" stroke-width="1.5"/><rect x="18" y="18" width="28" height="28" fill="none" stroke="#C9A961" stroke-width="1.4"/><rect x="18" y="18" width="28" height="28" fill="none" stroke="#C9A961" stroke-width="1.4" transform="rotate(45 32 32)"/><path d="M26 43V33a6 6 0 0 1 12 0v10M26 38h12" fill="none" stroke="#F3E7C4" stroke-width="2" stroke-linecap="round"/></svg><div><b>Hospitality Intelligence</b><span>Concept · Est. 1998 group</span></div></div>
+    <nav id="nav" aria-label="Main navigation"></nav>
+    <div class="side-foot">Demonstration build. Locations, projects and figures are illustrative, not AHK Group data.</div>
+  </aside>
+  <div id="scrim"></div>
+  <div id="wrap">
+    <header id="top">
+      <button id="burger" aria-label="Open menu">☰</button>
+      <div class="search"><input id="gs" type="search" placeholder="Search properties, guests, events, restaurants…" autocomplete="off" aria-label="Global search"><div id="sres"></div></div>
+      <div class="tools" style="position:relative">
+        <span class="mut tiny num" id="clock" style="white-space:nowrap"></span>
+        <button class="ico" id="cmdk" aria-label="Quick navigation" title="Quick navigation (Ctrl+K)">⌘K</button>
+        <a class="ico" href="../website/index.html" target="_blank" rel="noopener">Website ↗</a>
+        <button class="ico" id="theme"aria-label="Toggle theme" title="Toggle light / dark">◐</button>
+        <button class="ico" id="bell" aria-label="Notifications">🔔<span class="dot" id="bdot">4</span></button>
+        <div class="avatar" title="Executive profile">EX</div>
+        <div id="panel"></div>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+<div id="modal"><div id="mbox"></div></div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+/* ---------- shared demo data (single source for every page) ---------- */
+const MONTHS=['Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov'];
+const REV=[38,36,41,44,46,43,40,38,42,47,52,55];           // SAR M, whole group
+const SEG={'Hospitality':.42,'F&B':.31,'Events':.17,'Destination':.10};
+const TOTAL=REV.reduce((a,b)=>a+b,0);
+const PROPS=[
+ {id:'p1',name:'Demo Grand Riyadh',city:'Riyadh',x:56,y:42,rooms:320,occ:84,adr:910,rev:6.1,sat:4.7,staff:210,need:220,status:'Operational',tier:'5-star'},
+ {id:'p2',name:'Demo Corniche Jeddah',city:'Jeddah',x:24,y:56,rooms:280,occ:79,adr:840,rev:5.0,sat:4.6,staff:186,need:190,status:'Operational',tier:'5-star'},
+ {id:'p3',name:'Demo Bay Alkhobar',city:'Alkhobar',x:78,y:40,rooms:190,occ:71,adr:610,rev:3.4,sat:4.4,staff:120,need:128,status:'Operational',tier:'4-star'},
+ {id:'p4',name:'Demo Desert Retreat AlUla',city:'AlUla',x:26,y:30,rooms:96,occ:88,adr:1650,rev:3.9,sat:4.8,staff:98,need:98,status:'Peak season',tier:'Resort'},
+ {id:'p5',name:'Demo Highlands Abha',city:'Abha',x:36,y:80,rooms:140,occ:63,adr:520,rev:1.8,sat:4.3,staff:72,need:86,status:'Attention',tier:'4-star'},
+ {id:'p6',name:'Demo Haram Gate Madinah',city:'Madinah',x:22,y:42,rooms:360,occ:91,adr:780,rev:2.9,sat:4.5,staff:204,need:204,status:'Operational',tier:'4-star'}];
+const REST=[
+ {id:'r1',name:'Demo Majlis Grill',loc:'Riyadh',sales:4.2,cover:5800,food:29,margin:21,rating:4.6},
+ {id:'r2',name:'Demo Saffron Terrace',loc:'Jeddah',sales:3.6,cover:4900,food:31,margin:19,rating:4.5},
+ {id:'r3',name:'Demo Date & Ember',loc:'Alkhobar',sales:3.1,cover:4300,food:30,margin:18,rating:4.4},
+ {id:'r4',name:'Demo Oasis Table',loc:'AlUla',sales:2.4,cover:2100,food:34,margin:22,rating:4.8},
+ {id:'r5',name:'Demo Cedar Kitchen',loc:'Abha',sales:2.0,cover:3100,food:36,margin:13,rating:4.2},
+ {id:'r6',name:'Demo Souq Bites',loc:'Madinah',sales:1.75,cover:3900,food:33,margin:15,rating:4.3}];
+const DISHES=[['Lamb Mandi',3820,38,'Star'],['Saffron Seafood Rice',2910,34,'Star'],['Mezze Sharing Board',2640,52,'Star'],['Wagyu Kabsa',1980,29,'Review'],['Truffle Hummus',940,61,'Hidden gem'],['Charred Octopus',410,22,'Remove'],['Date Tiramisu',1730,57,'Star'],['Lentil Soup',380,48,'Reprice']];
+const STOCK=[['Basmati rice',420,300,'kg','ok'],['Lamb shoulder',64,120,'kg','crit'],['Saffron',2.1,4,'kg','crit'],['Fresh herbs',38,40,'kg','warn'],['Olive oil',180,100,'L','ok'],['Seafood mix',55,70,'kg','warn'],['Dates (Ajwa)',210,120,'kg','ok']];
+const SUPP=[['Gulf Fresh Produce','Delivered','PO-2041',48000],['Najd Meats Co.','In transit','PO-2044',126000],['Red Sea Seafood','Delayed','PO-2046',74000],['Al Wadi Dairy','Delivered','PO-2047',31000],['Spice Route Trading','Ordered','PO-2049',22000]];
+const PROJ=[
+ {id:'d1',name:'Demo Coastal Resort Concept',stage:'Concept',loc:'Red Sea coast',budget:420,spent:6,risk:'Low',pct:8,start:'2027 Q1',launch:'2030 Q3',partners:['Demo Marine Authority','Demo Design Studio']},
+ {id:'d2',name:'Demo Heritage Quarter Hotel',stage:'Feasibility',loc:'Diriyah area',budget:260,spent:11,risk:'Medium',pct:22,start:'2026 Q4',launch:'2029 Q2',partners:['Demo Heritage Board','Demo Consulting Group']},
+ {id:'d3',name:'Demo Mountain Wellness Lodge',stage:'Planning',loc:'Asir highlands',budget:180,spent:19,risk:'Low',pct:38,start:'2026 Q2',launch:'2028 Q4',partners:['Demo Eco Partners']},
+ {id:'d4',name:'Demo Events Arena District',stage:'Development',loc:'Riyadh north',budget:640,spent:288,risk:'High',pct:61,start:'2025 Q3',launch:'2027 Q4',partners:['Demo Build Co.','Demo Arena Ops','Demo Finance House']},
+ {id:'d5',name:'Demo Oasis Pavilion Village',stage:'Launch',loc:'AlUla',budget:310,spent:287,risk:'Low',pct:92,start:'2024 Q4',launch:'2027 Q1',partners:['Demo Culture Trust','Demo Build Co.']},
+ {id:'d6',name:'Demo Corniche Promenade',stage:'Operations',loc:'Jeddah',budget:150,spent:149,risk:'Low',pct:100,start:'2023 Q1',launch:'2025 Q2',partners:['Demo City Council']}];
+const STAGES=['Concept','Feasibility','Planning','Development','Launch','Operations'];
+let EVENTS=[
+ {id:'e1',name:'Demo Chairman’s Gala Dinner',type:'Gala',date:'2026-11-26',venue:'Demo Grand Riyadh · Ballroom',guests:420,vip:48,budget:1800,spent:1210,status:'Planning',lead:'Events Team A'},
+ {id:'e2',name:'Demo Hospitality Summit',type:'Conference',date:'2026-12-03',venue:'Demo Corniche Jeddah · Conference Hall',guests:900,vip:70,budget:2600,spent:1480,status:'Confirmed',lead:'Events Team B'},
+ {id:'e3',name:'Demo Winter Wedding Showcase',type:'Wedding',date:'2026-11-20',venue:'Demo Desert Retreat AlUla · Gardens',guests:260,vip:22,budget:950,spent:880,status:'Live prep',lead:'Events Team C'},
+ {id:'e4',name:'Demo National Day Brunch',type:'Brunch',date:'2026-11-18',venue:'Demo Bay Alkhobar · Terrace',guests:350,vip:15,budget:420,spent:405,status:'Live prep',lead:'Events Team A'},
+ {id:'e5',name:'Demo Corporate Retreat',type:'Corporate',date:'2026-12-11',venue:'Demo Highlands Abha',guests:140,vip:9,budget:380,spent:90,status:'Planning',lead:'Events Team B'},
+ {id:'e6',name:'Demo Culinary Week Launch',type:'Festival',date:'2026-12-17',venue:'Demo Haram Gate Madinah',guests:600,vip:31,budget:1100,spent:260,status:'Planning',lead:'Events Team C'},
+ {id:'e7',name:'Demo Investor Roundtable',type:'Corporate',date:'2026-11-24',venue:'Demo Grand Riyadh · Boardroom',guests:60,vip:60,budget:210,spent:120,status:'Confirmed',lead:'Events Team A'}];
+let GUESTS=[
+ {id:'g1',name:'Faisal A. (demo)',tier:'Platinum',visits:18,spend:312000,pref:'High floor, late checkout, Arabic coffee on arrival',sat:4.9,city:'Riyadh',last:'2026-11-09',email:'guest1@demo.ahk'},
+ {id:'g2',name:'Noura S. (demo)',tier:'Gold',visits:11,spend:148000,pref:'Spa evenings, quiet room, vegetarian menu',sat:4.7,city:'Jeddah',last:'2026-10-28',email:'guest2@demo.ahk'},
+ {id:'g3',name:'James T. (demo)',tier:'Gold',visits:7,spend:96000,pref:'Business suite, early breakfast, airport transfer',sat:4.4,city:'London',last:'2026-11-02',email:'guest3@demo.ahk'},
+ {id:'g4',name:'Maryam K. (demo)',tier:'Platinum',visits:21,spend:405000,pref:'Family villa, kids’ club, halal fine dining',sat:4.8,city:'Doha',last:'2026-11-12',email:'guest4@demo.ahk'},
+ {id:'g5',name:'Omar H. (demo)',tier:'Silver',visits:4,spend:31000,pref:'Sea view, late dinner',sat:4.1,city:'Dammam',last:'2026-09-30',email:'guest5@demo.ahk'},
+ {id:'g6',name:'Layla M. (demo)',tier:'Silver',visits:3,spend:24000,pref:'Wedding planning, floral decor',sat:4.6,city:'Abha',last:'2026-10-11',email:'guest6@demo.ahk'},
+ {id:'g7',name:'Khalid R. (demo)',tier:'Gold',visits:9,spend:118000,pref:'Golf package, steak dinners',sat:4.2,city:'Riyadh',last:'2026-11-05',email:'guest7@demo.ahk'},
+ {id:'g8',name:'Sara B. (demo)',tier:'Platinum',visits:15,spend:267000,pref:'AlUla stays, private dining, photography tours',sat:4.9,city:'Dubai',last:'2026-11-14',email:'guest8@demo.ahk'}];
+let FEEDBACK=[
+ {id:'f1',guest:'Faisal A. (demo)',cat:'Service',score:5,text:'Arrival experience was exceptional; the team remembered my preferences.',status:'Closed'},
+ {id:'f2',guest:'James T. (demo)',cat:'Room',score:3,text:'Air conditioning was noisy overnight. Room otherwise excellent.',status:'Open'},
+ {id:'f3',guest:'Omar H. (demo)',cat:'Dining',score:3,text:'Dinner service was slow on a busy evening.',status:'Open'},
+ {id:'f4',guest:'Noura S. (demo)',cat:'Spa',score:5,text:'The spa programme was outstanding and beautifully paced.',status:'Closed'},
+ {id:'f5',guest:'Khalid R. (demo)',cat:'Facilities',score:4,text:'Golf transfer ran late but staff handled it well.',status:'In review'}];
+const STAFF=[
+ ['Hospitality Ops','Front office',142,6,'Present'],['Hospitality Ops','Housekeeping',268,14,'Present'],['Hospitality Ops','Maintenance',64,5,'Present'],
+ ['F&B','Kitchen',231,12,'Present'],['F&B','Service',198,9,'Present'],['Events','Event crew',112,8,'Shift prep'],
+ ['Guest Relations','Concierge',46,2,'Present'],['Destination','Project office',38,3,'Present'],['Corporate','Finance & HR',54,2,'Present']];
+const FIN={rev:TOTAL,opex:TOTAL*.61,gp:TOTAL*.58,np:TOTAL*.19};
+const INTEG=[['Property management system','PMS','Connected'],['Point of sale (restaurants)','POS','Connected'],['Reservation engine','Booking','Connected'],['Accounting & ERP','Finance','Connected'],['Payroll & attendance','HR','Available'],['Guest messaging (WhatsApp)','CRM','Available'],['Procurement portal','Supply','Available'],['IoT energy meters','Facilities','Available']];
+const NAV=[['exec','Executive Overview','M3 12l9-9 9 9M5 10v10h14V10'],['ops','Hospitality Operations','M3 21V8l9-5 9 5v13M9 21v-6h6v6'],['fnb','F&B Management','M6 3v8a3 3 0 006 0V3M9 3v18M18 3c-2 2-2 8 0 9v9'],['dest','Destination Management','M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11zM12 12a2 2 0 100-4 2 2 0 000 4'],['events','Event Management','M4 6h16v14H4zM4 10h16M8 3v4M16 3v4'],['crm','Guest Experience CRM','M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0'],['ai','AI Business Intelligence','M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z'],['auto','AI Automation','M13 2L4 14h7l-1 8 9-12h-7z'],['agents','AI Agents & Approvals','M12 3a4 4 0 100 8 4 4 0 000-8zM4 21a8 8 0 0116 0M18 3v4M16 5h4'],['price','Dynamic Pricing','M12 2v20M17 6H9a3 3 0 000 6h6a3 3 0 010 6H6'],['fin','Financial Performance','M4 20V10M10 20V4M16 20v-8M22 20H2'],['staff','Staff & Workforce','M16 11a3 3 0 100-6M8 11a3 3 0 100-6M3 20a5 5 0 0110 0M13 20a5 5 0 018 0'],['reports','Reports & Analytics','M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h6'],['integ','Integrations','M9 7V3M15 7V3M7 7h10v5a5 5 0 01-10 0zM12 17v4'],['config','Settings','M12 15a3 3 0 100-6 3 3 0 000 6zM19 12l2-1-2-4-2 1-2-1V5H9v2l-2 1-2-1-2 4 2 1v2l-2 1 2 4 2-1 2 1v2h6v-2l2-1 2 1 2-4-2-1z']];
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const M=n=>'SAR '+(n>=100?Math.round(n):n.toFixed(1))+'M';
+const K=n=>n>=1e6?(n/1e6).toFixed(2)+'M':Math.round(n/1e3)+'K';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pillFor=s=>({Operational:'ok','Peak season':'gold',Attention:'warn',Confirmed:'ok',Planning:'mut','Live prep':'gold',Open:'warn',Closed:'ok','In review':'gold',Low:'ok',Medium:'warn',High:'crit',Delivered:'ok','In transit':'gold',Delayed:'crit',Ordered:'mut',Connected:'ok',Available:'mut',Present:'ok','Shift prep':'gold',Platinum:'gold',Gold:'gold',Silver:'mut'}[s]||'mut');
+const pill=s=>'<span class="pill '+pillFor(s)+'">'+esc(s)+'</span>';
+const demo='<span class="demo">Demonstration data</span>';
+let charts=[],cur='exec',period=12;
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2400)}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function mk(id,cfg){const el=document.getElementById(id);if(!el||!window.Chart)return;const mut=css('--mut'),grid=css('--chart-grid');
+  Chart.defaults.font.family="Inter,system-ui,sans-serif";Chart.defaults.color=mut;
+  cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,animation:{duration:900,easing:'easeOutQuart'},plugins:{legend:{display:cfg.legend!==false,labels:{boxWidth:10,usePointStyle:true}}}},cfg.options||{});
+  if(cfg.type!=='doughnut'){cfg.options.scales=Object.assign({x:{grid:{display:false}},y:{grid:{color:grid},beginAtZero:cfg.zero!==false}},cfg.options.scales||{})}
+  charts.push(new Chart(el,cfg))}
+const gold=()=>css('--gold'),emer=()=>css('--emerald'),navy=()=>css('--fg');
+function countUp(){document.querySelectorAll('[data-count]').forEach(el=>{const to=parseFloat(el.dataset.count),dec=+(el.dataset.dec||0),pre=el.dataset.pre||'',suf=el.dataset.suf||'';
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){el.textContent=pre+to.toFixed(dec)+suf;return}
+  const t0=performance.now();(function f(t){const p=Math.min(1,(t-t0)/1100),e=1-Math.pow(1-p,3);el.textContent=pre+(to*e).toFixed(dec)+suf;if(p<1)requestAnimationFrame(f)})(t0)})}
+function bars(){requestAnimationFrame(()=>document.querySelectorAll('.bar i[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'))}
+function csvOf(rows){return rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n')}
+function copy(text,msg){const done=()=>toast(msg||'Copied to clipboard');
+  try{navigator.clipboard.writeText(text).then(done,()=>fallback())}catch(e){fallback()}
+  function fallback(){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();try{document.execCommand('copy');done()}catch(e){toast('Select the text and copy it manually')}t.remove()}}
+function sortable(tid,rows,cols,onrow){ // simple interactive table
+  const host=document.getElementById(tid);let key=-1,dir=1;
+  function draw(){const data=rows.slice();if(key>=0)data.sort((a,b)=>{const x=a[key],y=b[key];return(typeof x==='number'?x-y:String(x).localeCompare(String(y)))*dir});
+    host.innerHTML='<div class="tablewrap"><table><thead><tr>'+cols.map((c,i)=>'<th class="s" data-i="'+i+'">'+c.h+(key===i?(dir>0?' ▲':' ▼'):'')+'</th>').join('')+'</tr></thead><tbody>'+data.map((r,ri)=>'<tr class="'+(onrow?'click':'')+'" data-r="'+ri+'">'+cols.map((c,i)=>'<td class="'+(c.n?'num':'')+'">'+(c.f?c.f(r[i],r):esc(r[i]))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+    host.querySelectorAll('th.s').forEach(th=>th.onclick=()=>{const i=+th.dataset.i;if(key===i)dir=-dir;else{key=i;dir=1}draw()});
+    if(onrow)host.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>onrow(data[+tr.dataset.r]))}
+  draw()}
+function openModal(title,html,mount){$('#mbox').innerHTML='<div class="mhead"><h2>'+title+'</h2><button class="btn line sm" id="mclose" aria-label="Close">Close ✕</button></div>'+html;$('#modal').classList.add('open');$('#mclose').onclick=closeModal;mount&&mount()}
+function closeModal(){$('#modal').classList.remove('open');charts=charts.filter(c=>{if(c.canvas&&document.body.contains(c.canvas))return true;c.destroy();return false})}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+function tabs(id,names,render){const host=document.getElementById(id);let on=0;
+  function d(){host.innerHTML='<div class="tabs">'+names.map((n,i)=>'<button class="'+(i===on?'on':'')+'" data-i="'+i+'">'+n+'</button>').join('')+'</div><div id="'+id+'b"></div>';
+    host.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{on=+b.dataset.i;d()});render(on,document.getElementById(id+'b'))}
+  d()}
+const pageHead=(t,sub,extra)=>'<div class="pagehead"><div><div class="eyebrow">AHK Hospitality Intelligence</div><h1>'+t+'</h1><p>'+sub+'</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+(extra||'')+demo+'</div></div>';
+
+/* ---------- pages ---------- */
+const PAGES={};
+PAGES.exec=()=>{
+  const hosp=PROPS.length,sat=(PROPS.reduce((a,p)=>a+p.sat*p.rev,0)/PROPS.reduce((a,p)=>a+p.rev,0)).toFixed(2);
+  const k=[['Total revenue (12 mo)',TOTAL,0,'SAR ','M','+12.4% vs prior year'],['Active locations',hosp+REST.length,0,'','',hosp+' hotels · '+REST.length+' restaurants'],['Guest satisfaction',+sat,2,'','/5','+0.08 vs last quarter'],['Event revenue',TOTAL*SEG.Events,1,'SAR ','M','+9.1% vs prior year'],['F&B performance',TOTAL*SEG['F&B'],1,'SAR ','M','Margin 19.6%'],['Operational efficiency',91.4,1,'','%','+1.7 pts']];
+  return pageHead('Welcome back, Executive','Portfolio at a glance across hospitality, F&B, events and destination development.','<select id="per" aria-label="Reporting period"><option value="12">Last 12 months</option><option value="6">Last 6 months</option><option value="3">Last quarter</option></select>')+
+  '<div class="grid g6">'+k.map((x,i)=>'<div class="card kpi hov" data-go="'+['fin','ops','crm','events','fnb','staff'][i]+'"><div class="mut tiny">'+x[0]+'</div><div class="v"><span data-count="'+x[1]+'" data-dec="'+x[2]+'" data-pre="'+x[3]+'" data-suf="'+x[4]+'">0</span></div><div class="d up">'+x[5]+'</div></div>').join('')+'</div>'+
+  '<div class="grid g21" style="margin-top:16px"><div class="card"><h3>Revenue performance <span class="mut tiny" id="revnote"></span></h3><div class="chart"><canvas id="c1"></canvas></div></div>'+
+  '<div class="insight"><div style="display:flex;gap:12px;align-items:center"><div class="orb" style="width:40px;height:40px"></div><div><h3>AI executive insights</h3><div class="tiny" style="color:#A9B4D2">Simulated insights from demo data</div></div></div>'+
+  '<div class="it"><b>Opportunity.</b> AlUla runs at 88% occupancy with the highest ADR. Extending seasonal packages could add ~SAR 0.6M/month.</div>'+
+  '<div class="it"><b>Alert.</b> Abha is short 14 staff against plan while occupancy is the lowest in the portfolio.</div>'+
+  '<div class="it"><b>Cost.</b> Lamb and saffron stock are below reorder level at two restaurants.</div>'+
+  '<div class="it"><button class="btn gold sm" data-go="ai">Ask AHK Intelligence →</button></div></div></div>'+
+  '<div class="grid g3" style="margin-top:16px"><div class="card"><h3>Business portfolio</h3><div class="chart sm"><canvas id="c2"></canvas></div></div>'+
+  '<div class="card"><h3>Guest experience</h3><div class="chart sm"><canvas id="c3"></canvas></div><div class="tiny mut" style="margin-top:8px">Returning guests: <b>38%</b> · Platinum tier: <b>12%</b></div></div>'+
+  '<div class="card"><h3>Operational overview</h3><div class="list">'+
+  '<div class="row"><span>Active hotels</span><b>'+hosp+'</b></div><div class="row"><span>Live events this week</span><b>'+EVENTS.filter(e=>e.status==='Live prep').length+'</b></div><div class="row"><span>Staff on duty</span><b class="num">'+PROPS.reduce((a,p)=>a+p.staff,0)+'</b></div><div class="row"><span>Open issues</span><b>'+(FEEDBACK.filter(f=>f.status!=='Closed').length+3)+'</b></div></div><button class="btn line sm" data-go="ops" style="margin-top:8px">Open operations</button></div></div>'+
+  '<div class="grid g2" style="margin-top:16px"><div class="card"><h3>Geographic portfolio <span class="mut tiny">Schematic · not to scale</span></h3>'+geo()+'</div>'+
+  '<div class="card"><h3>Recent activity</h3><div class="list">'+
+  ['Demo National Day Brunch moved to live preparation|Events · 12 min ago','Lamb shoulder reached reorder level at Demo Majlis Grill|F&B · 41 min ago','Platinum arrival confirmed at Demo Desert Retreat AlUla|Guest · 1 h ago','Feasibility study signed off for Demo Heritage Quarter Hotel|Destination · 3 h ago','Housekeeping completed early at Demo Grand Riyadh|Operations · 5 h ago'].map((a,i)=>{const[b,c]=a.split('|');return '<div class="row" style="cursor:pointer" data-go="'+['events','fnb','crm','dest','ops'][i]+'"><span>'+b+'</span><span class="mut tiny" style="white-space:nowrap">'+c+'</span></div>'}).join('')+'</div></div></div>'};
+function geo(){return '<div class="schematic"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M12 22 L45 8 L88 28 L92 62 L62 92 L28 88 L10 55Z" fill="var(--soft)" stroke="var(--gold)" stroke-width=".4" stroke-dasharray="1.5 1"/></svg>'+PROPS.map(p=>'<button class="pin" style="left:'+p.x+'%;top:'+p.y+'%" data-prop="'+p.id+'">'+p.city+'</button>').join('')+'</div>'}
+PAGES.exec.mount=()=>{
+  const draw=()=>{charts.forEach(c=>{if(c.canvas.id==='c1')c.destroy()});charts=charts.filter(c=>c.canvas&&c.canvas.id!=='c1');const n=period;
+    mk('c1',{type:'line',legend:false,data:{labels:MONTHS.slice(-n),datasets:[{label:'Revenue (SAR M)',data:REV.slice(-n),borderColor:gold(),backgroundColor:'rgba(201,169,97,.18)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:gold()}]}});
+    $('#revnote').textContent=n+' months · SAR '+REV.slice(-n).reduce((a,b)=>a+b,0)+'M'};
+  draw();$('#per').onchange=e=>{period=+e.target.value;draw()};
+  mk('c2',{type:'doughnut',data:{labels:Object.keys(SEG),datasets:[{data:Object.values(SEG).map(v=>Math.round(v*TOTAL)),backgroundColor:[css('--fg'),emer(),gold(),'#6D7FB0'],borderWidth:0}]},options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,usePointStyle:true}}}}});
+  mk('c3',{type:'line',legend:false,zero:false,data:{labels:MONTHS.slice(-6),datasets:[{label:'Satisfaction',data:[4.45,4.48,4.5,4.52,4.55,4.58],borderColor:emer(),tension:.35,pointRadius:3}]},options:{scales:{y:{min:4.2,max:5,grid:{color:css('--chart-grid')}}}}})};
+
+PAGES.ops=()=>pageHead('Hospitality Operations','Monitor every property from one control room.','')+
+ '<div class="filters"><input type="search" id="opq" placeholder="Filter properties…" aria-label="Filter properties"><select id="ops_s"><option value="">All statuses</option><option>Operational</option><option>Peak season</option><option>Attention</option></select><select id="ops_o"><option value="rev">Sort: revenue</option><option value="occ">Sort: occupancy</option><option value="sat">Sort: satisfaction</option></select></div><div class="grid g3" id="pcards"></div>'+
+ '<div class="card" style="margin-top:16px" id="opsTabs"></div>';
+PAGES.ops.mount=()=>{
+  const draw=()=>{const q=$('#opq').value.toLowerCase(),s=$('#ops_s').value,o=$('#ops_o').value;
+    const L=PROPS.filter(p=>(!q||(p.name+p.city).toLowerCase().includes(q))&&(!s||p.status===s)).sort((a,b)=>b[o]-a[o]);
+    $('#pcards').innerHTML=L.length?L.map(p=>'<div class="card hov" data-prop="'+p.id+'"><h3>'+p.name+' '+pill(p.status)+'</h3><div class="mut tiny">'+p.city+' · '+p.tier+' · '+p.rooms+' rooms</div>'+
+      '<div style="margin:12px 0 4px" class="tiny mut">Occupancy '+p.occ+'%</div><div class="bar"><i data-w="'+p.occ+'"></i></div>'+
+      '<div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px"><div><div class="mut tiny">Revenue</div><b>SAR '+p.rev+'M</b></div><div><div class="mut tiny">Staff</div><b class="'+(p.staff<p.need?'down':'')+'">'+p.staff+'/'+p.need+'</b></div><div><div class="mut tiny">Guests</div><b>'+p.sat+'★</b></div></div></div>').join(''):'<div class="card mut">No properties match these filters.</div>';bars()};
+  draw();['opq','ops_s','ops_o'].forEach(i=>$('#'+i).addEventListener('input',draw));
+  tabs('opsTabs',['Maintenance','Housekeeping','Inventory','Issues','Staff allocation'],(i,h)=>{
+    const T=[
+     [['Ticket','Property','Issue','Priority','Status'],[['MR-118','Demo Corniche Jeddah','Chiller unit noise, floor 6','Medium','Open'],['MR-121','Demo Grand Riyadh','Lift 3 inspection','Low','Scheduled'],['MR-124','Demo Highlands Abha','Water heater replacement','High','Open'],['MR-127','Demo Bay Alkhobar','Pool pump service','Medium','In review']]],
+     [['Property','Rooms ready','In progress','Inspection'],PROPS.map(p=>[p.name,Math.round(p.rooms*.74),Math.round(p.rooms*.18),Math.round(p.rooms*.08)])],
+     [['Item','Property','Level','Reorder at','Status'],[['Linen sets','Demo Grand Riyadh','1,240','800','Present'],['Amenity kits','Demo Highlands Abha','310','400','Attention'],['Cleaning supplies','Demo Corniche Jeddah','88%','50%','Present'],['Minibar stock','Demo Desert Retreat AlUla','64%','40%','Present']]],
+     [['Issue','Property','Owner','Age','Status'],[['Slow check-in at peak','Demo Grand Riyadh','Front Office','2d','Open'],['Guest Wi-Fi drops','Demo Haram Gate Madinah','IT','1d','In review'],['Short-staffed night shift','Demo Highlands Abha','HR','4d','Open']]],
+     [['Property','On duty','Required','Gap'],PROPS.map(p=>[p.name,p.staff,p.need,p.staff-p.need])]][i];
+    h.innerHTML='<div class="tablewrap"><table><thead><tr>'+T[0].map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>'+T[1].map(r=>'<tr>'+r.map(c=>'<td>'+(['Open','Scheduled','In review','Attention','Present'].includes(c)?pill(c==='Scheduled'?'Planning':c):esc(c))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>'})};
+function propModal(id){const p=PROPS.find(x=>x.id===id);if(!p)return;
+  openModal(p.name,'<div class="mut tiny">'+p.city+' · '+p.tier+' · '+pill(p.status)+' '+demo+'</div><div class="grid g6" style="margin:14px 0">'+[['Occupancy',p.occ+'%'],['ADR','SAR '+p.adr],['RevPAR','SAR '+Math.round(p.adr*p.occ/100)],['Revenue / mo','SAR '+p.rev+'M'],['Satisfaction',p.sat+'★'],['Staffing',p.staff+'/'+p.need]].map(x=>'<div class="card"><div class="mut tiny">'+x[0]+'</div><b style="font-size:20px">'+x[1]+'</b></div>').join('')+'</div>'+
+  '<div class="grid g2"><div class="card"><h3>Revenue trend (SAR M)</h3><div class="chart sm"><canvas id="pm1"></canvas></div></div><div class="card"><h3>Operational activity</h3><div class="list"><div class="row"><span>Check-ins today</span><b>'+Math.round(p.rooms*.3)+'</b></div><div class="row"><span>Check-outs today</span><b>'+Math.round(p.rooms*.28)+'</b></div><div class="row"><span>Open maintenance tickets</span><b>'+(p.status==='Attention'?5:2)+'</b></div><div class="row"><span>Rooms ready</span><b>'+Math.round(p.rooms*.74)+'</b></div></div><details style="margin-top:8px"><summary style="cursor:pointer">Expand: service quality notes</summary><p class="mut">Front-desk wait time averages 4 minutes; breakfast service rated 4.5★. Demo narrative for presentation.</p></details></div></div>',
+  ()=>{const s=p.rev/23.1;mk('pm1',{type:'bar',legend:false,data:{labels:MONTHS.slice(-6),datasets:[{data:REV.slice(-6).map(v=>+(v*.42*s).toFixed(2)),backgroundColor:gold(),borderRadius:6}]}})})}
+
+PAGES.fnb=()=>pageHead('F&B Management','Restaurant portfolio, menu engineering, stock and cost control.','')+
+ '<div class="grid g6">'+[['Restaurants',REST.length,0,'',''],['Monthly sales',REST.reduce((a,r)=>a+r.sales,0),2,'SAR ','M'],['Avg food cost',REST.reduce((a,r)=>a+r.food,0)/REST.length,1,'','%'],['Avg margin',REST.reduce((a,r)=>a+r.margin,0)/REST.length,1,'','%']].map(x=>'<div class="card kpi"><div class="mut tiny">'+x[0]+'</div><div class="v"><span data-count="'+x[1]+'" data-dec="'+x[2]+'" data-pre="'+x[3]+'" data-suf="'+x[4]+'">0</span></div></div>').join('')+'</div>'+
+ '<div class="grid g21" style="margin-top:16px"><div class="card"><h3>Sales analytics <span class="seg" id="fseg"><button class="on" data-m="d">Daily</button><button data-m="w">Weekly</button><button data-m="m">Monthly</button></span></h3><div class="chart"><canvas id="f1"></canvas></div></div>'+
+ '<div class="insight"><h3>AI recommendations</h3><div class="tiny" style="color:#A9B4D2">Simulated, based on demo data</div><div class="it"><b>Menu.</b> Retire Charred Octopus (22% margin, low volume). Promote Truffle Hummus, a 61% margin item.</div><div class="it"><b>Inventory.</b> Raise lamb reorder level to 140 kg ahead of the Gala dinner.</div><div class="it"><b>Cost.</b> Consolidating seafood suppliers could cut food cost by about 1.4 pts at Cedar Kitchen.</div></div></div>'+
+ '<div class="grid g2" style="margin-top:16px"><div class="card"><h3>Restaurant portfolio</h3><div id="rt"></div></div><div class="card"><h3>Location comparison</h3><div class="chart"><canvas id="f2"></canvas></div></div></div>'+
+ '<div class="card" style="margin-top:16px" id="fTabs"></div>';
+PAGES.fnb.mount=()=>{
+  const series={d:[['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],[.48,.52,.55,.6,.78,.82,.7]],w:[['W1','W2','W3','W4'],[3.9,4.2,4.4,4.5]],m:[MONTHS.slice(-6),REV.slice(-6).map(v=>+(v*SEG['F&B']).toFixed(1))]};
+  const draw=m=>{charts=charts.filter(c=>{if(c.canvas.id==='f1'){c.destroy();return false}return true});mk('f1',{type:'bar',legend:false,data:{labels:series[m][0],datasets:[{label:'SAR M',data:series[m][1],backgroundColor:gold(),borderRadius:6}]}})};
+  draw('d');document.querySelectorAll('#fseg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#fseg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');draw(b.dataset.m)});
+  sortable('rt',REST.map(r=>[r.name,r.loc,r.sales,r.food,r.margin,r.rating]),[{h:'Restaurant'},{h:'City'},{h:'Sales',n:1,f:v=>'SAR '+v+'M'},{h:'Food %',n:1,f:v=>v+'%'},{h:'Margin',n:1,f:v=>v+'%'},{h:'Rating',n:1,f:v=>v+'★'}]);
+  mk('f2',{type:'bar',data:{labels:REST.map(r=>r.loc),datasets:[{label:'Food cost %',data:REST.map(r=>r.food),backgroundColor:css('--fg'),borderRadius:5},{label:'Margin %',data:REST.map(r=>r.margin),backgroundColor:emer(),borderRadius:5}]}});
+  tabs('fTabs',['Menu performance','Inventory','Suppliers','Cost control'],(i,h)=>{
+    if(i===0){h.innerHTML='<div id="mt"></div>';sortable('mt',DISHES,[{h:'Dish'},{h:'Units / mo',n:1,f:v=>v.toLocaleString()},{h:'Margin',n:1,f:v=>v+'%'},{h:'Class',f:v=>pill(v==='Star'?'Confirmed':v==='Remove'?'High':v==='Hidden gem'?'Platinum':'Medium').replace('>'+(v==='Star'?'Confirmed':v==='Remove'?'High':v==='Hidden gem'?'Platinum':'Medium')+'<','>'+v+'<')}])}
+    if(i===1)h.innerHTML='<div class="tablewrap"><table><thead><tr><th>Ingredient</th><th>On hand</th><th>Reorder at</th><th>Level</th><th>Alert</th></tr></thead><tbody>'+STOCK.map(s=>'<tr><td>'+s[0]+'</td><td class="num">'+s[1]+' '+s[3]+'</td><td class="num">'+s[2]+' '+s[3]+'</td><td style="min-width:120px"><div class="bar"><i data-w="'+Math.min(100,s[1]/s[2]*60)+'"></i></div></td><td>'+(s[4]==='ok'?pill('Operational').replace('Operational','OK'):s[4]==='warn'?pill('Attention').replace('Attention','Low'):pill('High').replace('High','Reorder now'))+'</td></tr>').join('')+'</tbody></table></div>',bars();
+    if(i===2)h.innerHTML='<div class="tablewrap"><table><thead><tr><th>Supplier</th><th>PO</th><th>Value</th><th>Delivery</th><th></th></tr></thead><tbody>'+SUPP.map((s,n)=>'<tr><td>'+s[0]+'</td><td>'+s[2]+'</td><td class="num">SAR '+s[3].toLocaleString()+'</td><td>'+pill(s[1])+'</td><td><button class="btn line sm" data-po="'+n+'">Track</button></td></tr>').join('')+'</tbody></table></div>',h.querySelectorAll('[data-po]').forEach(b=>b.onclick=()=>{const s=SUPP[+b.dataset.po];openModal(s[0],'<p>'+s[2]+' · SAR '+s[3].toLocaleString()+'</p><p>Status: '+pill(s[1])+'</p><div class="gen"><i style="width:'+(s[1]==='Delivered'?100:s[1]==='In transit'?66:s[1]==='Delayed'?40:15)+'%"></i></div><p class="mut tiny">Demonstration purchase order.</p>')});
+    if(i===3)h.innerHTML='<div class="grid g2"><div class="chart sm"><canvas id="f3"></canvas></div><div class="list">'+[['Food cost','31%'],['Labour cost','28%'],['Occupancy & utilities','9%'],['Other operating','13%'],['Operating margin','19%']].map(x=>'<div class="row"><span>'+x[0]+'</span><b>'+x[1]+'</b></div>').join('')+'</div></div>',mk('f3',{type:'doughnut',data:{labels:['Food','Labour','Utilities','Other','Margin'],datasets:[{data:[31,28,9,13,19],backgroundColor:[css('--fg'),'#6D7FB0',gold(),'#A9B4D2',emer()],borderWidth:0}]},options:{cutout:'60%',plugins:{legend:{position:'right'}}}})})};
+
+PAGES.dest=()=>pageHead('Destination Management','Pipeline, budgets, milestones and risk across development projects. Illustrative projects only.','')+
+ '<div class="grid g6">'+[['Projects',PROJ.length,0,'',''],['Pipeline budget',PROJ.reduce((a,p)=>a+p.budget,0),0,'SAR ','M'],['Spent to date',PROJ.reduce((a,p)=>a+p.spent,0),0,'SAR ','M'],['High-risk',PROJ.filter(p=>p.risk==='High').length,0,'','']].map(x=>'<div class="card kpi"><div class="mut tiny">'+x[0]+'</div><div class="v"><span data-count="'+x[1]+'" data-pre="'+x[3]+'" data-suf="'+x[4]+'">0</span></div></div>').join('')+'</div>'+
+ '<h3 style="margin:22px 0 10px">Development pipeline</h3><div class="pipe">'+STAGES.map(s=>'<div class="col"><h4>'+s+' · '+PROJ.filter(p=>p.stage===s).length+'</h4>'+PROJ.filter(p=>p.stage===s).map(p=>'<div class="pcard" data-proj="'+p.id+'"><b class="tiny">'+p.name+'</b><div class="mut tiny">'+p.loc+'</div><div class="bar" style="margin-top:6px"><i data-w="'+p.pct+'"></i></div></div>').join('')+'</div>').join('')+'</div>'+
+ '<div class="grid g2" style="margin-top:16px"><div class="card"><h3>Budget vs spend (SAR M)</h3><div class="chart"><canvas id="d1"></canvas></div></div><div class="card"><h3>Destination map <span class="mut tiny">Schematic</span></h3><div class="schematic"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M12 22 L45 8 L88 28 L92 62 L62 92 L28 88 L10 55Z" fill="var(--soft)" stroke="var(--gold)" stroke-width=".4" stroke-dasharray="1.5 1"/></svg>'+PROJ.map((p,i)=>{const pos=[[20,30],[62,38],[32,76],[58,50],[26,34],[24,58]][i];return '<button class="pin" style="left:'+(pos[0]+(i===4?6:0))+'%;top:'+(pos[1]+(i===4?6:0))+'%" data-proj="'+p.id+'">'+p.stage+'</button>'}).join('')+'</div></div></div>'+
+ '<div class="card" style="margin-top:16px"><h3>Risk monitor</h3><div id="rk"></div></div>';
+PAGES.dest.mount=()=>{bars();mk('d1',{type:'bar',data:{labels:PROJ.map(p=>p.name.replace('Demo ','').split(' ').slice(0,2).join(' ')),datasets:[{label:'Budget',data:PROJ.map(p=>p.budget),backgroundColor:css('--fg'),borderRadius:5},{label:'Spent',data:PROJ.map(p=>p.spent),backgroundColor:gold(),borderRadius:5}]}});
+  sortable('rk',PROJ.map(p=>[p.name,p.stage,p.risk,p.pct,p.launch]),[{h:'Project'},{h:'Stage'},{h:'Risk',f:v=>pill(v)},{h:'Progress',n:1,f:v=>v+'%'},{h:'Target launch'}],r=>projModal(PROJ.find(p=>p.name===r[0]).id))};
+function projModal(id){const p=PROJ.find(x=>x.id===id);if(!p)return;const si=STAGES.indexOf(p.stage);
+  openModal(p.name,'<div class="mut tiny">'+p.loc+' · '+pill(p.risk)+' risk · '+demo+'</div><div style="display:flex;gap:4px;margin:16px 0">'+STAGES.map((s,i)=>'<div style="flex:1"><div class="bar"><i data-w="'+(i<=si?100:0)+'"></i></div><div class="tiny '+(i===si?'':'mut')+'" style="margin-top:4px">'+s+'</div></div>').join('')+'</div>'+
+  '<div class="grid g3"><div class="card"><div class="mut tiny">Budget</div><b style="font-size:22px">SAR '+p.budget+'M</b></div><div class="card"><div class="mut tiny">Spent</div><b style="font-size:22px">SAR '+p.spent+'M</b></div><div class="card"><div class="mut tiny">Timeline</div><b>'+p.start+' → '+p.launch+'</b></div></div>'+
+  '<div class="grid g2" style="margin-top:14px"><div class="card"><h3>Milestones</h3><div class="list">'+['Concept approved','Feasibility study','Master plan','Construction','Pre-opening','Operations handover'].map((m,i)=>'<div class="row"><span>'+m+'</span>'+(i<=si?pill('Confirmed').replace('Confirmed','Done'):pill('Planning').replace('Planning','Upcoming'))+'</div>').join('')+'</div></div><div class="card"><h3>Partners & stakeholders</h3><div class="list">'+p.partners.map(x=>'<div class="row"><span>'+x+'</span><span class="mut tiny">Demo partner</span></div>').join('')+'</div></div></div>',bars)}
+
+const CAL={y:2026,m:10,view:'month'};
+PAGES.events=()=>pageHead('Event Management Command Center','Calendar, workspaces, VIPs, vendors and budgets in one place.','<button class="btn gold" id="newev">+ New event</button>')+
+ '<div class="grid g6" id="evk"></div><div class="grid g21" style="margin-top:16px"><div class="card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px"><div class="seg" id="cv"><button data-v="month">Month</button><button data-v="week">Week</button><button data-v="agenda">Agenda</button></div><div><button class="btn line sm" id="cp">‹</button> <b id="cl" style="display:inline-block;min-width:130px;text-align:center"></b> <button class="btn line sm" id="cn">›</button></div></div><div id="cal"></div></div>'+
+ '<div class="card"><h3>Real-time status</h3><div id="live"></div></div></div><div class="card" style="margin-top:16px"><h3>Event portfolio</h3><div id="et"></div></div>';
+PAGES.events.mount=()=>{
+  const ymd=(y,m,d)=>y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  const draw=()=>{
+    $('#evk').innerHTML=[['Events',EVENTS.length],['Guests',EVENTS.reduce((a,e)=>a+e.guests,0).toLocaleString()],['VIPs',EVENTS.reduce((a,e)=>a+e.vip,0)],['Budget','SAR '+(EVENTS.reduce((a,e)=>a+e.budget,0)/1000).toFixed(1)+'M'],['Spent','SAR '+(EVENTS.reduce((a,e)=>a+e.spent,0)/1000).toFixed(1)+'M']].map(x=>'<div class="card kpi"><div class="mut tiny">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>').join('');
+    document.querySelectorAll('#cv button').forEach(b=>b.classList.toggle('on',b.dataset.v===CAL.view));
+    const first=new Date(CAL.y,CAL.m,1),days=new Date(CAL.y,CAL.m+1,0).getDate(),lead=(first.getDay()+6)%7;
+    $('#cl').textContent=first.toLocaleString('en',{month:'long',year:'numeric'});
+    const evs=d=>EVENTS.filter(e=>e.date===d);let h='';
+    if(CAL.view==='month'){h='<div class="cal">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div class="h">'+x+'</div>').join('');
+      for(let i=0;i<lead;i++)h+='<div class="d off"></div>';
+      for(let d=1;d<=days;d++){const k=ymd(CAL.y,CAL.m,d);h+='<div class="d '+(k==='2026-11-17'?'today':'')+'"><b>'+d+'</b>'+evs(k).map(e=>'<button class="ev" data-ev="'+e.id+'">'+esc(e.name.replace('Demo ',''))+'</button>').join('')+'</div>'}h+='</div>'}
+    if(CAL.view==='week'){const base=new Date(2026,10,16);h='<div class="list">'+[0,1,2,3,4,5,6].map(i=>{const d=new Date(base);d.setDate(base.getDate()+i);const k=ymd(d.getFullYear(),d.getMonth(),d.getDate());return '<div class="row"><b style="min-width:84px">'+d.toLocaleString('en',{weekday:'short',day:'numeric',month:'short'})+'</b><div style="flex:1">'+(evs(k).map(e=>'<button class="ev" data-ev="'+e.id+'">'+esc(e.name)+' · '+e.guests+' guests</button>').join('')||'<span class="mut tiny">No events</span>')+'</div></div>'}).join('')+'</div><div class="tiny mut">Week of 16 Nov 2026</div>'}
+    if(CAL.view==='agenda'){h='<div class="list">'+EVENTS.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>'<div class="row"><div><b>'+esc(e.name)+'</b><div class="mut tiny">'+e.date+' · '+esc(e.venue)+'</div></div><div style="text-align:right">'+pill(e.status)+'<div><button class="btn line sm" data-ev="'+e.id+'" style="margin-top:4px">Open</button></div></div></div>').join('')+'</div>'}
+    $('#cal').innerHTML=h;
+    $('#live').innerHTML=EVENTS.filter(e=>['Live prep','Confirmed'].includes(e.status)).slice(0,4).map(e=>{const p=Math.round(e.spent/e.budget*100);return '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between"><b class="tiny">'+esc(e.name.replace('Demo ',''))+'</b>'+pill(e.status)+'</div><div class="bar" style="margin-top:6px"><i data-w="'+p+'"></i></div><div class="tiny mut">Budget used '+p+'%</div></div>'}).join('');bars();
+    sortable('et',EVENTS.map(e=>[e.name,e.type,e.date,e.guests,e.budget,e.status,e.id]),[{h:'Event'},{h:'Type'},{h:'Date'},{h:'Guests',n:1},{h:'Budget',n:1,f:v=>'SAR '+v+'K'},{h:'Status',f:v=>pill(v)}],r=>eventModal(r[6]));
+    document.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>eventModal(b.dataset.ev))};
+  draw();
+  document.querySelectorAll('#cv button').forEach(b=>b.onclick=()=>{CAL.view=b.dataset.v;draw()});
+  $('#cp').onclick=()=>{CAL.m--;if(CAL.m<0){CAL.m=11;CAL.y--}draw()};$('#cn').onclick=()=>{CAL.m++;if(CAL.m>11){CAL.m=0;CAL.y++}draw()};
+  $('#newev').onclick=()=>openModal('New event','<form id="nef" class="form"><div><label for="nn">Event name</label><input id="nn" required value="Demo Private Dinner"></div><div><label for="nt">Type</label><select id="nt"><option>Gala</option><option>Wedding</option><option>Conference</option><option>Corporate</option><option>Brunch</option></select></div><div><label for="nd">Date</label><input id="nd" type="date" required value="2026-12-20"></div><div><label for="nv">Venue</label><select id="nv">'+PROPS.map(p=>'<option>'+p.name+'</option>').join('')+'</select></div><div><label for="ng">Expected guests</label><input id="ng" type="number" min="1" value="120"></div><div><label for="nb">Budget (SAR K)</label><input id="nb" type="number" min="1" value="300"></div></form><div style="margin-top:16px"><button class="btn gold" id="nsave">Create event</button></div>',()=>{
+    $('#nsave').onclick=()=>{if(!$('#nef').reportValidity())return;const d=$('#nd').value;EVENTS.push({id:'e'+(EVENTS.length+1),name:$('#nn').value,type:$('#nt').value,date:d,venue:$('#nv').value,guests:+$('#ng').value,vip:Math.round($('#ng').value*.08),budget:+$('#nb').value,spent:0,status:'Planning',lead:'Unassigned'});const dt=new Date(d);CAL.y=dt.getFullYear();CAL.m=dt.getMonth();closeModal();draw();toast('Event created')}})};
+function eventModal(id){const e=EVENTS.find(x=>x.id===id);if(!e)return;
+  openModal(esc(e.name),'<div class="mut tiny">'+e.date+' · '+esc(e.venue)+' · '+pill(e.status)+' · '+demo+'</div><div id="evt" style="margin-top:14px"></div>',()=>{
+    tabs('evt',['Overview','Guests','Venue & catering','Staff','Finance','Timeline','Checklist'],(i,h)=>{
+      if(i===0)h.innerHTML='<div class="grid g3"><div class="card"><div class="mut tiny">Guests</div><b style="font-size:22px">'+e.guests+'</b></div><div class="card"><div class="mut tiny">VIPs</div><b style="font-size:22px">'+e.vip+'</b></div><div class="card"><div class="mut tiny">Lead</div><b>'+e.lead+'</b></div></div>';
+      if(i===1)h.innerHTML='<div class="list">'+GUESTS.slice(0,5).map((g,n)=>'<div class="row"><span>'+g.name+'</span><span>'+(n<3?pill('Platinum').replace('Platinum','VIP'):pill('Confirmed'))+'</span></div>').join('')+'</div><p class="mut tiny">Sample of the registered list.</p>';
+      if(i===2)h.innerHTML='<div class="list"><div class="row"><span>Venue</span><b>'+esc(e.venue)+'</b></div><div class="row"><span>Capacity</span><b>'+Math.round(e.guests*1.25)+'</b></div><div class="row"><span>Menu</span><b>Five-course set menu + live stations</b></div><div class="row"><span>Dietary requests</span><b>'+Math.round(e.guests*.12)+' flagged</b></div></div>';
+      if(i===3)h.innerHTML='<div class="list">'+[['Event captain',2],['Service staff',Math.round(e.guests/12)],['Kitchen crew',Math.round(e.guests/30)],['Security & valet',Math.round(e.guests/50)+3]].map(x=>'<div class="row"><span>'+x[0]+'</span><b>'+x[1]+'</b></div>').join('')+'</div>';
+      if(i===4)h.innerHTML='<div class="grid g3"><div class="card"><div class="mut tiny">Budget</div><b style="font-size:22px">SAR '+e.budget+'K</b></div><div class="card"><div class="mut tiny">Spent</div><b style="font-size:22px">SAR '+e.spent+'K</b></div><div class="card"><div class="mut tiny">Remaining</div><b style="font-size:22px">SAR '+(e.budget-e.spent)+'K</b></div></div><div class="bar" style="margin-top:14px"><i data-w="'+Math.round(e.spent/e.budget*100)+'"></i></div>',bars();
+      if(i===5)h.innerHTML='<div class="list">'+[['16:00','Venue ready'],['18:00','Guest arrival'],['19:00','Opening programme'],['20:00','Dinner service'],['22:30','Closing']].map(x=>'<div class="row"><b>'+x[0]+'</b><span>'+x[1]+'</span></div>').join('')+'</div>';
+      if(i===6)h.innerHTML='<div class="list">'+['Floor plan approved','Catering confirmed','VIP arrival plan','AV check','Security briefing'].map((x,n)=>'<label class="row" style="cursor:pointer"><span>'+x+'</span><input type="checkbox" '+(n<3?'checked':'')+'></label>').join('')+'</div>'})})}
+
+PAGES.crm=()=>pageHead('Guest Experience CRM','Know every guest, remember every preference.','')+
+ '<div class="grid g21"><div class="card"><div class="filters"><input type="search" id="gq" placeholder="Search guests…" aria-label="Search guests"><select id="gt"><option value="">All tiers</option><option>Platinum</option><option>Gold</option><option>Silver</option></select></div><div id="gl"></div></div>'+
+ '<div class="card"><h3>Satisfaction sentiment</h3><div class="chart sm"><canvas id="s1"></canvas></div><div class="list" style="margin-top:8px"><div class="row"><span>Positive</span><b class="up">78%</b></div><div class="row"><span>Neutral</span><b>15%</b></div><div class="row"><span>Negative</span><b class="down">7%</b></div></div></div></div>'+
+ '<div class="card" style="margin-top:16px"><h3>Feedback & reviews</h3><div id="fb"></div></div>';
+PAGES.crm.mount=()=>{
+  const draw=()=>{const q=$('#gq').value.toLowerCase(),t=$('#gt').value;const L=GUESTS.filter(g=>(!q||(g.name+g.city+g.pref).toLowerCase().includes(q))&&(!t||g.tier===t));
+    $('#gl').innerHTML=L.length?'<div class="list">'+L.map(g=>'<div class="row" style="cursor:pointer" data-g="'+g.id+'"><div><b>'+g.name+'</b><div class="mut tiny">'+g.city+' · '+g.visits+' visits · SAR '+K(g.spend)+'</div></div><div style="text-align:right">'+pill(g.tier)+'<div class="tiny">'+g.sat+'★</div></div></div>').join('')+'</div>':'<p class="mut">No guests match.</p>';
+    document.querySelectorAll('[data-g]').forEach(r=>r.onclick=()=>guestModal(r.dataset.g))};
+  draw();$('#gq').oninput=draw;$('#gt').onchange=draw;
+  mk('s1',{type:'line',legend:false,zero:false,data:{labels:MONTHS.slice(-6),datasets:[{data:[72,74,75,77,77,78],borderColor:emer(),tension:.35,fill:true,backgroundColor:'rgba(31,138,107,.15)'}]}});
+  const fb=()=>{$('#fb').innerHTML='<div class="list">'+FEEDBACK.map(f=>'<div class="row"><div><b>'+f.guest+'</b> <span class="pill mut">'+f.cat+'</span> <span class="tiny">'+'★'.repeat(f.score)+'</span><div class="tiny mut">'+esc(f.text)+'</div></div><div style="text-align:right">'+pill(f.status)+'<div><button class="btn line sm" data-fb="'+f.id+'" style="margin-top:4px">'+(f.status==='Closed'?'Reopen':'Resolve')+'</button></div></div></div>').join('')+'</div>';
+    document.querySelectorAll('[data-fb]').forEach(b=>b.onclick=()=>{const f=FEEDBACK.find(x=>x.id===b.dataset.fb);f.status=f.status==='Closed'?'Open':'Closed';fb();toast('Feedback marked '+f.status.toLowerCase())})};fb()};
+function guestModal(id){const g=GUESTS.find(x=>x.id===id);if(!g)return;
+  openModal(g.name,'<div class="mut tiny">'+pill(g.tier)+' · '+g.city+' · last visit '+g.last+' · '+demo+'</div><div class="grid g2" style="margin-top:14px"><div class="card"><h3>Profile</h3><div class="form" style="grid-template-columns:1fr"><div><label for="ge">Email</label><input id="ge" value="'+g.email+'"></div><div><label for="gp">Preferences</label><textarea id="gp" rows="3">'+esc(g.pref)+'</textarea></div><div><label for="gtier">Tier</label><select id="gtier">'+['Platinum','Gold','Silver'].map(t=>'<option '+(t===g.tier?'selected':'')+'>'+t+'</option>').join('')+'</select></div></div><button class="btn gold sm" id="gsave" style="margin-top:12px">Save changes</button></div>'+
+  '<div class="card"><h3>History & recommendations</h3><div class="list"><div class="row"><span>Visits</span><b>'+g.visits+'</b></div><div class="row"><span>Lifetime spend</span><b>SAR '+g.spend.toLocaleString()+'</b></div><div class="row"><span>Satisfaction</span><b>'+g.sat+'★</b></div></div><p class="tiny"><b>Suggested next offer (simulated):</b> '+(g.tier==='Platinum'?'Private dining experience at Demo Desert Retreat AlUla':'Weekend package with late checkout')+'</p><p class="tiny mut">Last contact: welcome message sent '+g.last+'.</p></div></div>',()=>{
+  $('#gsave').onclick=()=>{g.email=$('#ge').value;g.pref=$('#gp').value;g.tier=$('#gtier').value;toast('Guest profile updated');closeModal();if(cur==='crm')go('crm',true)}})}
+
+const QA={'How is revenue trending?':'Group revenue for the last 12 months is SAR '+TOTAL+'M in the demo data, with November at SAR 55M, up from SAR 38M twelve months ago. Hospitality is the largest segment at 42%.','Which property needs attention?':'Demo Highlands Abha: occupancy 63%, satisfaction 4.3, and staffing 14 below plan. Closing the staffing gap is the first suggested action.','How can we cut F&B costs?':'Three levers in the demo data: consolidate seafood suppliers (about 1.4 pts food cost at Cedar Kitchen), retire Charred Octopus, and raise lamb reorder level to avoid emergency purchasing.','Forecast next quarter':'Simulated forecast: Dec SAR 57M, Jan SAR 54M, Feb SAR 58M, driven by AlUla season and the Hospitality Summit. This is a projection from demo data, not a prediction model.','Summarise events this month':'There are '+EVENTS.length+' events in the demo calendar, '+EVENTS.reduce((a,e)=>a+e.guests,0).toLocaleString()+' expected guests, and the largest is the Hospitality Summit on 3 Dec.'};
+PAGES.ai=()=>pageHead('AI Business Intelligence','AHK Intelligence · simulated assistant answering from demonstration data. No live AI model or real forecasting is connected.','')+
+ '<div class="grid g21"><div class="ai-dark"><div style="display:flex;gap:12px;align-items:center;margin-bottom:12px"><div class="orb"></div><div><h3 style="color:#F3E7C4">AHK Intelligence</h3><div class="tiny mut">Simulated responses</div></div></div><div class="chat"><div class="msgs" id="msgs"><div class="m a">Good afternoon. Ask about revenue, properties, F&B or events. Answers are simulated from the demo dataset.</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">'+Object.keys(QA).map(q=>'<button class="chip" data-q="'+q+'">'+q+'</button>').join('')+'</div><form id="cf" style="display:flex;gap:8px"><input id="ci" class="f" style="flex:1;padding:10px;border-radius:8px" placeholder="Ask AHK Intelligence…" aria-label="Ask a question"><button class="btn gold" type="submit">Send</button></form></div></div>'+
+ '<div style="display:grid;gap:16px"><div class="card"><h3>Forecast <span class="pill gold">Illustrative</span></h3><div class="chart sm"><canvas id="a1"></canvas></div></div><div class="card"><h3>Anomaly detection</h3><div class="list"><div class="row"><span>Abha occupancy −9 pts vs 4-week avg</span>'+pill('Medium')+'</div><div class="row"><span>Cedar Kitchen food cost +2.1 pts</span>'+pill('High')+'</div><div class="row"><span>AlUla ADR +14% vs plan</span>'+pill('Low').replace('Low','Positive')+'</div></div></div></div></div>'+
+ '<div class="grid g2" style="margin-top:16px"><div class="card"><h3>Revenue intelligence</h3><div class="list"><div class="row"><span>Highest-yield property</span><b>AlUla (ADR SAR 1,650)</b></div><div class="row"><span>Fastest growing segment</span><b>Events +9.1%</b></div><div class="row"><span>Upsell opportunity</span><b>Spa + dining bundles</b></div></div></div><div class="card"><h3>AI reports</h3><p class="mut tiny">Generate an executive summary from demo data.</p><button class="btn gold sm" id="rep">Generate executive summary</button><pre class="csv" id="repout" style="display:none;margin-top:10px"></pre><button class="btn line sm" id="repcopy" style="display:none;margin-top:8px">Copy summary</button></div></div>';
+PAGES.ai.mount=()=>{
+  const ask=q=>{const m=$('#msgs');m.insertAdjacentHTML('beforeend','<div class="m u">'+esc(q)+'</div><div class="m a typing" id="ty"><i></i><i></i><i></i></div>');m.scrollTop=m.scrollHeight;
+    setTimeout(()=>{const a=QA[q]||'In this concept build I can answer the five preset questions above. A production version would connect to your live data.';$('#ty').remove();const d=document.createElement('div');d.className='m a';m.appendChild(d);let i=0;(function t(){d.textContent=a.slice(0,i+=3);m.scrollTop=m.scrollHeight;if(i<a.length)setTimeout(t,16);else d.insertAdjacentHTML('beforeend','<div class="tiny mut" style="margin-top:6px">Simulated response · demo data</div>')})()},900)};
+  document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>ask(b.dataset.q));
+  $('#cf').onsubmit=e=>{e.preventDefault();const v=$('#ci').value.trim();if(v){ask(v);$('#ci').value=''}};
+  mk('a1',{type:'line',data:{labels:['Sep','Oct','Nov','Dec','Jan','Feb'],datasets:[{label:'Actual',data:[47,52,55,null,null,null],borderColor:gold(),tension:.3},{label:'Simulated forecast',data:[null,null,55,57,54,58],borderColor:emer(),borderDash:[6,4],tension:.3}]}});
+  $('#rep').onclick=()=>{const t='AHK HOSPITALITY INTELLIGENCE · EXECUTIVE SUMMARY (DEMO DATA)\nRevenue (12 mo): SAR '+TOTAL+'M · Nov: SAR 55M\nPortfolio: '+PROPS.length+' hotels, '+REST.length+' restaurants, '+PROJ.length+' destination projects\nTop performer: Demo Desert Retreat AlUla (88% occupancy)\nWatch list: Demo Highlands Abha (staffing gap 14)\nEvents: '+EVENTS.length+' scheduled, largest Hospitality Summit (3 Dec)\nSimulated outlook: Dec SAR 57M';$('#repout').style.display='block';$('#repout').textContent=t;$('#repcopy').style.display='inline-block';$('#repcopy').onclick=()=>copy(t,'Summary copied')}};
+
+PAGES.fin=()=>pageHead('Financial Performance','Click any metric for its breakdown.','<select id="fp"><option value="12">12 months</option><option value="6">6 months</option><option value="3">Quarter</option></select><button class="btn line sm" id="fx">Copy CSV</button>')+
+ '<div class="grid g6" id="fk"></div><div class="grid g2" style="margin-top:16px"><div class="card"><h3>Monthly financial trend</h3><div class="chart"><canvas id="n1"></canvas></div></div><div class="card"><h3>Revenue by segment</h3><div class="chart"><canvas id="n2"></canvas></div></div></div>'+
+ '<div class="grid g2" style="margin-top:16px"><div class="card"><h3>Budget vs actual</h3><div id="bv"></div></div><div class="card"><h3>Cash flow & forecast <span class="pill gold">Illustrative</span></h3><div class="chart"><canvas id="n3"></canvas></div></div></div>';
+PAGES.fin.mount=()=>{
+  const n=()=>+$('#fp').value;
+  const draw=()=>{const r=REV.slice(-n()),rv=r.reduce((a,b)=>a+b,0),ox=rv*.61,gp=rv*.58,np=rv*.19;
+    const K6=[['Total revenue',rv],['Operating expenses',ox],['Gross profit',gp],['Net profit',np]];
+    $('#fk').innerHTML=K6.map((x,i)=>'<div class="card kpi hov" data-fk="'+i+'"><div class="mut tiny">'+x[0]+'</div><div class="v">SAR '+x[1].toFixed(0)+'M</div><div class="d mut">Tap for breakdown</div></div>').join('');
+    document.querySelectorAll('[data-fk]').forEach(c=>c.onclick=()=>{const x=K6[+c.dataset.fk];openModal(x[0],'<p class="mut tiny">'+demo+' · last '+n()+' months</p><div class="grid g2"><div class="card"><div class="chart sm"><canvas id="fm"></canvas></div></div><div class="list">'+Object.entries(SEG).map(([k,v])=>'<div class="row"><span>'+k+'</span><b>SAR '+(x[1]*v).toFixed(1)+'M</b></div>').join('')+'</div></div>',()=>mk('fm',{type:'doughnut',data:{labels:Object.keys(SEG),datasets:[{data:Object.values(SEG).map(v=>+(x[1]*v).toFixed(1)),backgroundColor:[css('--fg'),emer(),gold(),'#6D7FB0'],borderWidth:0}]},options:{cutout:'60%'}}))});
+    charts=charts.filter(c=>{if(['n1','n2','n3'].includes(c.canvas.id)){c.destroy();return false}return true});
+    mk('n1',{type:'bar',data:{labels:MONTHS.slice(-n()),datasets:[{label:'Revenue',data:r,backgroundColor:gold(),borderRadius:5},{label:'Net profit',data:r.map(v=>+(v*.19).toFixed(1)),backgroundColor:emer(),borderRadius:5}]}});
+    mk('n2',{type:'doughnut',data:{labels:Object.keys(SEG),datasets:[{data:Object.values(SEG).map(v=>+(rv*v).toFixed(1)),backgroundColor:[css('--fg'),emer(),gold(),'#6D7FB0'],borderWidth:0}]},options:{cutout:'60%',plugins:{legend:{position:'bottom'}}}});
+    mk('n3',{type:'line',data:{labels:['Sep','Oct','Nov','Dec','Jan','Feb'],datasets:[{label:'Operating cash flow (SAR M)',data:[8.1,9.4,10.2,10.8,9.9,11],borderColor:emer(),tension:.3,fill:true,backgroundColor:'rgba(31,138,107,.12)'}]}});
+    $('#bv').innerHTML='<div class="tablewrap"><table><thead><tr><th>Unit</th><th>Budget</th><th>Actual</th><th>Var.</th></tr></thead><tbody>'+Object.entries(SEG).map(([k,v],i)=>{const a=rv*v,b=a*[.97,1.03,.98,1.05][i];const d=(a-b)/b*100;return '<tr><td>'+k+'</td><td class="num">SAR '+b.toFixed(1)+'M</td><td class="num">SAR '+a.toFixed(1)+'M</td><td class="num '+(d>=0?'up':'down')+'">'+(d>=0?'+':'')+d.toFixed(1)+'%</td></tr>'}).join('')+'</tbody></table></div>'};
+  draw();$('#fp').onchange=draw;
+  $('#fx').onclick=()=>copy(csvOf([['Month','Revenue SAR M','Net profit SAR M']].concat(REV.slice(-n()).map((v,i)=>[MONTHS.slice(-n())[i],v,(v*.19).toFixed(1)]))),'Financial CSV copied')};
+
+PAGES.staff=()=>pageHead('Staff & Workforce','Scheduling, attendance and performance across divisions.','')+
+ '<div class="grid g6">'+[['Headcount',STAFF.reduce((a,s)=>a+s[2],0)],['On shift now',Math.round(STAFF.reduce((a,s)=>a+s[2],0)*.58)],['Open roles',STAFF.reduce((a,s)=>a+s[3],0)],['Attendance','96.2%']].map(x=>'<div class="card kpi"><div class="mut tiny">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>').join('')+'</div>'+
+ '<div class="grid g21" style="margin-top:16px"><div class="card"><h3>Workforce by team</h3><div id="st"></div></div><div class="card"><h3>Attendance this week</h3><div class="chart sm"><canvas id="w1"></canvas></div></div></div>'+
+ '<div class="card" style="margin-top:16px"><h3>Shift schedule</h3><div class="tablewrap"><table><thead><tr><th>Team</th><th>Morning</th><th>Evening</th><th>Night</th></tr></thead><tbody>'+STAFF.slice(0,6).map(s=>'<tr><td>'+s[1]+'</td><td class="num">'+Math.round(s[2]*.42)+'</td><td class="num">'+Math.round(s[2]*.38)+'</td><td class="num">'+Math.round(s[2]*.2)+'</td></tr>').join('')+'</tbody></table></div></div>';
+PAGES.staff.mount=()=>{sortable('st',STAFF,[{h:'Division'},{h:'Team'},{h:'Headcount',n:1},{h:'Open roles',n:1},{h:'Today',f:v=>pill(v)}]);
+  mk('w1',{type:'bar',legend:false,zero:false,data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[{data:[96,97,96,95,97,94,96],backgroundColor:emer(),borderRadius:5}]},options:{scales:{y:{min:90,max:100,grid:{color:css('--chart-grid')}}}}})};
+
+const REPORTS=['Executive Performance','Hospitality Operations','F&B Performance','Event Performance','Guest Satisfaction','Financial Performance','Workforce','Destination Development'];
+function reportRows(cat,n){switch(cat){
+  case 'Hospitality Operations':return[['Property','Occupancy %','ADR SAR','Revenue SAR M','Satisfaction']].concat(PROPS.map(p=>[p.name,p.occ,p.adr,p.rev,p.sat]));
+  case 'F&B Performance':return[['Restaurant','Sales SAR M','Food cost %','Margin %','Rating']].concat(REST.map(r=>[r.name,r.sales,r.food,r.margin,r.rating]));
+  case 'Event Performance':return[['Event','Date','Guests','Budget SAR K','Spent SAR K']].concat(EVENTS.map(e=>[e.name,e.date,e.guests,e.budget,e.spent]));
+  case 'Guest Satisfaction':return[['Guest','Tier','Visits','Satisfaction']].concat(GUESTS.map(g=>[g.name,g.tier,g.visits,g.sat]));
+  case 'Workforce':return[['Division','Team','Headcount','Open roles']].concat(STAFF.map(s=>[s[0],s[1],s[2],s[3]]));
+  case 'Destination Development':return[['Project','Stage','Budget SAR M','Spent SAR M','Risk']].concat(PROJ.map(p=>[p.name,p.stage,p.budget,p.spent,p.risk]));
+  default:return[['Month','Revenue SAR M','Net profit SAR M']].concat(REV.slice(-n).map((v,i)=>[MONTHS.slice(-n)[i],v,(v*.19).toFixed(1)]))}}
+PAGES.reports=()=>pageHead('Reports & Analytics','Generate a report from any division, preview it, and copy it as CSV or text.','')+
+ '<div class="card"><div class="form"><div><label for="rc">Report</label><select id="rc">'+REPORTS.map(r=>'<option>'+r+' Report</option>').join('')+'</select></div><div><label for="rr">Date range</label><select id="rr"><option value="12">Last 12 months</option><option value="6">Last 6 months</option><option value="3">Last quarter</option></select></div><div><label for="ru">Business unit</label><select id="ru"><option>All units</option><option>Hospitality</option><option>F&B</option><option>Events</option><option>Destination</option></select></div></div><div style="margin-top:14px"><button class="btn gold" id="rg">Generate report</button></div><div class="gen" style="margin-top:14px"><i id="rgb"></i></div></div><div id="rprev"></div>'+
+ '<p class="tiny mut">Downloads are disabled in the shared viewer, so export copies the report to your clipboard. PDF export would be a production feature.</p>';
+PAGES.reports.mount=()=>{$('#rg').onclick=()=>{$('#rprev').innerHTML='';$('#rgb').style.width='0';requestAnimationFrame(()=>$('#rgb').style.width='100%');$('#rg').disabled=true;
+  setTimeout(()=>{$('#rg').disabled=false;const cat=$('#rc').value.replace(' Report',''),n=+$('#rr').value,rows=reportRows(cat,n),csv=csvOf(rows);
+    $('#rprev').innerHTML='<div class="card" style="margin-top:16px"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><div class="eyebrow">Report preview</div><h2>'+esc($('#rc').value)+'</h2><div class="mut tiny">'+$('#rr').selectedOptions[0].text+' · '+$('#ru').value+' · Demonstration data</div></div><div style="display:flex;gap:8px;align-items:flex-start"><button class="btn gold sm" id="rcsv">Copy CSV</button><button class="btn line sm" id="rtxt">Copy as text</button></div></div><div class="tablewrap" style="margin-top:12px"><table><thead><tr>'+rows[0].map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>'+rows.slice(1).map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div></div>';
+    $('#rcsv').onclick=()=>copy(csv,'CSV copied');$('#rtxt').onclick=()=>copy($('#rc').value+'\n'+rows.map(r=>r.join(' | ')).join('\n'),'Report copied');toast('Report generated')},1300)}};
+
+PAGES.integ=()=>pageHead('Integrations','Connect the systems AHK Group already runs. Connections here are simulated.','')+
+ '<div class="grid g3">'+INTEG.map((x,i)=>'<div class="card"><h3>'+x[0]+'</h3><div class="mut tiny">'+x[1]+'</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><span id="is'+i+'">'+pill(x[2])+'</span><button class="btn line sm" data-i="'+i+'">'+(x[2]==='Connected'?'Disconnect':'Connect')+'</button></div></div>').join('')+'</div>';
+PAGES.integ.mount=()=>document.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;INTEG[i][2]=INTEG[i][2]==='Connected'?'Available':'Connected';b.textContent=INTEG[i][2]==='Connected'?'Disconnect':'Connect';$('#is'+i).innerHTML=pill(INTEG[i][2]);toast(INTEG[i][0]+' '+(INTEG[i][2]==='Connected'?'connected (simulated)':'disconnected')+'')});
+
+const PREF={name:'Executive',lang:'English',a1:true,a2:true,a3:false};
+PAGES.config=()=>pageHead('Settings','Profile, notifications and appearance.','')+
+ '<div class="grid g2"><div class="card"><h3>Profile</h3><div class="form" style="grid-template-columns:1fr"><div><label for="pn">Display name</label><input id="pn" value="'+PREF.name+'"></div><div><label for="pl">Language</label><select id="pl"><option>English</option><option>العربية (preview)</option></select></div></div><button class="btn gold sm" id="ps" style="margin-top:12px">Save profile</button></div>'+
+ '<div class="card"><h3>Notifications & appearance</h3><div class="list">'+[['a1','Operational alerts'],['a2','Event updates'],['a3','Weekly executive digest']].map(x=>'<div class="row"><span>'+x[1]+'</span><button class="toggle '+(PREF[x[0]]?'on':'')+'" data-t="'+x[0]+'" aria-label="'+x[1]+'"></button></div>').join('')+'<div class="row"><span>Theme</span><div class="seg"><button data-th="light">Light</button><button data-th="dark">Dark</button></div></div></div></div></div>';
+PAGES.config.mount=()=>{$('#ps').onclick=()=>{PREF.name=$('#pn').value||'Executive';toast('Profile saved')};document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{PREF[b.dataset.t]=!PREF[b.dataset.t];b.classList.toggle('on')});
+  document.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>setTheme(b.dataset.th))};
+
+/* ---------- AI automation, agents, pricing ---------- */
+const TRIGS=['Stock falls below reorder level','VIP booking within 48 hours','Guest review scores 3★ or lower','Event status changes to Confirmed','Occupancy forecast exceeds 90%','Maintenance ticket is created','Every Sunday at 08:00'];
+const CONDS=['No extra condition','Item is perishable and supplier is approved','Guest tier is Platinum or Gold','Value is above SAR 50K','Property is in peak season'];
+const ACTS=['Draft purchase order','Notify procurement lead','Brief housekeeping with guest preferences','Notify general manager','Open service-recovery ticket','Draft personalised apology','Propose staffing plan','Propose rate change','Classify priority and route ticket','Send executive digest'];
+const AUTOS=['Notify only','Needs approval','Fully automatic'];
+let WF=[
+ {id:'w1',name:'Low-stock purchase orders',trig:TRIGS[0],cond:CONDS[1],acts:['Draft purchase order','Notify procurement lead'],auto:'Needs approval',on:true,runs:142,hrs:36},
+ {id:'w2',name:'VIP arrival preparation',trig:TRIGS[1],cond:CONDS[2],acts:['Brief housekeeping with guest preferences','Notify general manager'],auto:'Fully automatic',on:true,runs:87,hrs:29},
+ {id:'w3',name:'Review recovery',trig:TRIGS[2],cond:CONDS[0],acts:['Open service-recovery ticket','Draft personalised apology'],auto:'Needs approval',on:true,runs:51,hrs:17},
+ {id:'w4',name:'Event staffing plan',trig:TRIGS[3],cond:CONDS[0],acts:['Propose staffing plan','Notify general manager'],auto:'Needs approval',on:true,runs:24,hrs:22},
+ {id:'w5',name:'Demand-based rate proposal',trig:TRIGS[4],cond:CONDS[4],acts:['Propose rate change'],auto:'Needs approval',on:true,runs:63,hrs:14},
+ {id:'w6',name:'Maintenance triage',trig:TRIGS[5],cond:CONDS[0],acts:['Classify priority and route ticket'],auto:'Fully automatic',on:true,runs:210,hrs:48},
+ {id:'w7',name:'Weekly executive digest',trig:TRIGS[6],cond:CONDS[0],acts:['Send executive digest'],auto:'Fully automatic',on:false,runs:0,hrs:0}];
+let APPR=[
+ {id:'a1',agent:'Procurement Agent',title:'Purchase order PO-2051: lamb shoulder, 180 kg',val:'SAR 41,400',why:'Stock is 64 kg against a 120 kg reorder level, and the Chairman’s Gala needs about 90 kg more.',st:'Pending'},
+ {id:'a2',agent:'Revenue Agent',title:'Raise Demo Grand Riyadh weekend rates by 8%',val:'+SAR 212K / 14 days',why:'Forecast occupancy 90% with a major event nearby; competitors have moved up 5%.',st:'Pending'},
+ {id:'a3',agent:'Concierge Agent',title:'Complimentary room upgrade for a Platinum guest arriving tomorrow',val:'SAR 0 net cost',why:'Platinum guest, 18 visits, last stay rated 4.9★. A suite is unsold tomorrow.',st:'Pending'},
+ {id:'a4',agent:'Events Agent',title:'Add 6 service staff to Demo National Day Brunch',val:'SAR 5,800',why:'Guest count rose from 300 to 350. Current ratio is below the 1:12 standard.',st:'Pending'}];
+let RUNLOG=[{t:'Today 09:12',wf:'Low-stock purchase orders',res:'PO-2051 drafted, awaiting approval'},{t:'Today 08:40',wf:'Maintenance triage',res:'MR-124 classified High, routed to Abha engineering'},{t:'Yesterday 17:05',wf:'VIP arrival preparation',res:'Housekeeping briefed for 2 arrivals'},{t:'Yesterday 14:22',wf:'Review recovery',res:'Apology drafted for James T. (demo)'}];
+const AGENTS=[
+ {n:'Revenue Agent',d:'Watches demand and competitor rates, proposes pricing.',lvl:'Needs approval',on:true,done:318,acts:['Proposed +8% weekend rate at Riyadh','Flagged AlUla ADR +14% vs plan','Paused discounting at Madinah']},
+ {n:'Concierge Agent',d:'Drafts guest replies and prepares VIP arrivals.',lvl:'Needs approval',on:true,done:1204,acts:['Drafted late-checkout reply','Briefed housekeeping for Platinum arrival','Suggested spa booking for Noura S.']},
+ {n:'Procurement Agent',d:'Tracks stock and supplier deliveries, drafts purchase orders.',lvl:'Needs approval',on:true,done:462,acts:['Drafted PO-2051 for lamb','Chased delayed seafood delivery','Compared two saffron quotes']},
+ {n:'Events Agent',d:'Plans staffing, vendors and run sheets for events.',lvl:'Needs approval',on:true,done:97,acts:['Built Gala run sheet','Proposed 6 extra staff for Brunch','Reminded vendor for AV check']},
+ {n:'Maintenance Agent',d:'Classifies tickets and routes them to the right team.',lvl:'Fully automatic',on:true,done:890,acts:['Classified MR-124 as High','Scheduled lift inspection','Merged two duplicate tickets']},
+ {n:'Finance Agent',d:'Reconciles budgets and highlights variances.',lvl:'Notify only',on:false,done:56,acts:['Flagged Cedar Kitchen food cost +2.1 pts','Prepared monthly variance note']}];
+const pillA=s=>'<span class="pill '+(s==='Pending'?'warn':s==='Approved'?'ok':'crit')+'">'+s+'</span>';
+function draftFrom(t){t=t.toLowerCase();let r={ti:5,ci:0,ac:['Classify priority and route ticket'],nm:'Custom automation'};
+ if(/stock|inventory|supplier|order/.test(t))r={ti:0,ci:1,ac:['Draft purchase order','Notify procurement lead'],nm:'Stock replenishment'};
+ else if(/vip|platinum|arrival/.test(t))r={ti:1,ci:2,ac:['Brief housekeeping with guest preferences','Notify general manager'],nm:'VIP arrival preparation'};
+ else if(/review|complain|feedback|apolog/.test(t))r={ti:2,ci:0,ac:['Open service-recovery ticket','Draft personalised apology'],nm:'Review recovery'};
+ else if(/event|gala|wedding/.test(t))r={ti:3,ci:0,ac:['Propose staffing plan','Notify general manager'],nm:'Event staffing'};
+ else if(/price|rate|occupancy|demand/.test(t))r={ti:4,ci:4,ac:['Propose rate change','Notify general manager'],nm:'Demand-based rate proposal'};
+ else if(/week|digest|report|summary/.test(t))r={ti:6,ci:0,ac:['Send executive digest'],nm:'Weekly executive digest'};
+ return r}
+const pendingN=()=>APPR.filter(a=>a.st==='Pending').length;
+
+PAGES.auto=()=>pageHead('AI Automation Studio','Workflows that run in the background. Runs on this page are simulated using demonstration data.','')+
+ '<div class="grid g6" id="ast"></div>'+
+ '<div class="grid g21" style="margin-top:16px"><div><h3 style="margin-bottom:10px">Active workflows</h3><div id="wfl"></div></div>'+
+ '<div class="card" style="align-self:start"><h3>Create an automation</h3><label class="tiny mut" for="bd">Describe it in plain English</label><div style="display:flex;gap:6px;margin:4px 0 12px"><input id="bd" class="f" style="flex:1;padding:9px" placeholder="e.g. when a VIP is arriving, brief housekeeping"><button class="btn gold sm" id="bdraft">Draft with AI</button></div><div class="tiny mut" style="margin-bottom:10px">AI drafting is simulated with keyword rules in this prototype.</div>'+
+ '<div class="form" style="grid-template-columns:1fr"><div><label for="bn">Name</label><input id="bn" placeholder="Workflow name"></div><div><label for="bt">When</label><select id="bt">'+TRIGS.map((t,i)=>'<option value="'+i+'">'+t+'</option>').join('')+'</select></div><div><label for="bc">Only if</label><select id="bc">'+CONDS.map((t,i)=>'<option value="'+i+'">'+t+'</option>').join('')+'</select></div><div><label>Then</label>'+ACTS.map((a,i)=>'<label style="display:flex;gap:8px;color:var(--fg);margin:3px 0"><input type="checkbox" class="bact" value="'+a+'" style="width:auto"> '+a+'</label>').join('')+'</div><div><label for="ba">Autonomy</label><select id="ba">'+AUTOS.map((a,i)=>'<option '+(i===1?'selected':'')+'>'+a+'</option>').join('')+'</select></div></div><button class="btn gold" id="bcreate" style="margin-top:14px;width:100%">Create workflow</button></div></div>'+
+ '<div class="card" style="margin-top:16px"><h3>Run log</h3><div id="rlog"></div></div>';
+PAGES.auto.mount=()=>{
+  const stats=()=>{$('#ast').innerHTML=[['Active workflows',WF.filter(w=>w.on).length],['Runs this month',WF.reduce((a,w)=>a+w.runs,0)],['Hours saved (demo)',WF.reduce((a,w)=>a+w.hrs,0)],['Awaiting approval',pendingN()]].map(x=>'<div class="card kpi"><div class="mut tiny">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>').join('')};
+  const flow=w=>'<div class="flow"><span class="node t">When: '+w.trig+'</span><span class="arr">→</span><span class="node c">If: '+w.cond+'</span>'+w.acts.map(a=>'<span class="arr">→</span><span class="node a">'+a+'</span>').join('')+'</div>';
+  const list=()=>{stats();$('#wfl').innerHTML=WF.map(w=>'<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">'+esc(w.name)+'</h3><div style="display:flex;gap:8px;align-items:center"><span class="pill '+(w.auto==='Fully automatic'?'ok':w.auto==='Needs approval'?'gold':'mut')+'">'+w.auto+'</span><button class="btn line sm" data-run="'+w.id+'">Test run</button><button class="toggle '+(w.on?'on':'')+'" data-wt="'+w.id+'" aria-label="Enable '+esc(w.name)+'"></button></div></div>'+flow(w)+'<div class="tiny mut">'+w.runs+' runs · '+w.hrs+' h saved this month (demo)</div></div>').join('');
+    document.querySelectorAll('[data-wt]').forEach(b=>b.onclick=()=>{const w=WF.find(x=>x.id===b.dataset.wt);w.on=!w.on;list();toast(w.name+(w.on?' enabled':' paused'))});
+    document.querySelectorAll('[data-run]').forEach(b=>b.onclick=()=>runWf(b.dataset.run,list))};
+  const log=()=>{$('#rlog').innerHTML='<div class="tablewrap"><table><thead><tr><th>When</th><th>Workflow</th><th>Result</th></tr></thead><tbody>'+RUNLOG.map(r=>'<tr><td class="num">'+r.t+'</td><td>'+esc(r.wf)+'</td><td>'+esc(r.res)+'</td></tr>').join('')+'</tbody></table></div>'};
+  list();log();
+  $('#bdraft').onclick=()=>{const v=$('#bd').value.trim();if(!v){toast('Describe the automation first');return}const r=draftFrom(v);$('#bn').value=r.nm;$('#bt').value=r.ti;$('#bc').value=r.ci;document.querySelectorAll('.bact').forEach(c=>c.checked=r.ac.includes(c.value));toast('Draft ready. Review it, then create.')};
+  $('#bcreate').onclick=()=>{const nm=$('#bn').value.trim(),ac=[...document.querySelectorAll('.bact:checked')].map(c=>c.value);if(!nm){toast('Give the workflow a name');return}if(!ac.length){toast('Choose at least one action');return}
+    WF.unshift({id:'w'+Date.now(),name:nm,trig:TRIGS[+$('#bt').value],cond:CONDS[+$('#bc').value],acts:ac,auto:$('#ba').value,on:true,runs:0,hrs:0});$('#bn').value='';$('#bd').value='';document.querySelectorAll('.bact').forEach(c=>c.checked=false);list();toast('Workflow created')};
+  PAGES.auto.log=log};
+function runWf(id,after){const w=WF.find(x=>x.id===id);if(!w)return;
+  const steps=['Trigger received: '+w.trig,'Checking condition: '+w.cond].concat(w.acts.map(a=>'Action: '+a),[w.auto==='Needs approval'?'Proposal sent to the approvals inbox':w.auto==='Notify only'?'Notification sent to the owner':'Completed automatically']);
+  openModal('Test run: '+esc(w.name),'<p class="mut tiny">Simulated run on demonstration data. Nothing is changed in any system. '+demo+'</p><div class="gen" style="margin:12px 0"><i id="rb"></i></div><div id="rl"></div>',()=>{
+    let i=0;(function nx(){const l=document.getElementById('rl');if(!l)return;if(i<steps.length){l.insertAdjacentHTML('beforeend','<div class="step"><i>✓</i><span>'+esc(steps[i])+'</span></div>');i++;document.getElementById('rb').style.width=Math.round(i/steps.length*100)+'%';setTimeout(nx,650)}else{
+      w.runs++;w.hrs+=1;RUNLOG.unshift({t:'Just now',wf:w.name,res:steps[steps.length-1]});
+      if(w.auto==='Needs approval'){APPR.unshift({id:'a'+Date.now(),agent:'Workflow: '+w.name,title:'Review proposal from test run',val:'Simulated',why:'Generated by a test run of “'+w.name+'”.',st:'Pending'})}
+      l.insertAdjacentHTML('beforeend','<p class="up" style="margin-top:10px"><b>Run complete.</b></p>');if(PAGES.auto.log&&cur==='auto')PAGES.auto.log();after&&after()}})()})}
+
+PAGES.agents=()=>pageHead('AI Agents & Approvals','Agents prepare the work. You set how much freedom each one has. Behaviour here is simulated.','')+
+ '<div class="grid g3" id="ag"></div>'+
+ '<div class="grid g2" style="margin-top:16px"><div class="card"><h3>Approvals inbox <span id="apn" class="pill warn"></span></h3><div id="ap"></div></div>'+
+ '<div class="card"><h3>Concierge copilot</h3><div class="form" style="grid-template-columns:1fr 1fr"><div><label for="cg">Guest</label><select id="cg">'+GUESTS.map(g=>'<option value="'+g.id+'">'+g.name+'</option>').join('')+'</select></div><div><label for="ct">Tone</label><select id="ct"><option>Warm</option><option>Formal</option><option>Brief</option></select></div><div style="grid-column:1/-1"><label for="cm">Guest message</label><select id="cm"><option value="late">Can we have a late checkout tomorrow?</option><option value="table">Please arrange a table for six tonight</option><option value="spa">Is the spa available this evening?</option><option value="issue">The air conditioning in our room is noisy</option><option value="transfer">Can you organise an airport transfer?</option></select></div></div><button class="btn gold sm" id="cd" style="margin:12px 0">Draft reply</button><div id="co" class="m a" style="display:none;white-space:pre-wrap"></div><div id="ca" style="display:none;margin-top:10px"></div><p class="tiny mut" style="margin-top:10px">Drafts use the guest’s profile preferences. Simulated text, no message is sent.</p></div></div>';
+PAGES.agents.mount=()=>{
+  const ag=()=>{$('#ag').innerHTML=AGENTS.map((a,i)=>'<div class="card"><h3 style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span>'+a.n+'</span><button class="toggle '+(a.on?'on':'')+'" data-at="'+i+'" aria-label="Enable '+a.n+'"></button></h3><p class="mut tiny" style="margin:0 0 10px">'+a.d+'</p><label class="tiny mut" for="al'+i+'">Autonomy</label><select id="al'+i+'" data-al="'+i+'" style="width:100%;margin:4px 0 10px">'+AUTOS.map(x=>'<option '+(x===a.lvl?'selected':'')+'>'+x+'</option>').join('')+'</select><div style="display:flex;justify-content:space-between;align-items:center"><span class="tiny mut">'+a.done.toLocaleString()+' tasks · '+(a.on?'active':'paused')+'</span><button class="btn line sm" data-ad="'+i+'">Recent actions</button></div></div>').join('');
+    document.querySelectorAll('[data-at]').forEach(b=>b.onclick=()=>{const a=AGENTS[+b.dataset.at];a.on=!a.on;ag();toast(a.n+(a.on?' resumed':' paused'))});
+    document.querySelectorAll('[data-al]').forEach(s=>s.onchange=()=>{const a=AGENTS[+s.dataset.al];a.lvl=s.value;toast(a.n+': '+a.lvl)});
+    document.querySelectorAll('[data-ad]').forEach(b=>b.onclick=()=>{const a=AGENTS[+b.dataset.ad];openModal(a.n,'<div class="list">'+a.acts.map(x=>'<div class="row"><span>'+x+'</span><span class="mut tiny">Simulated</span></div>').join('')+'</div>')})};
+  const ap=()=>{$('#apn').textContent=pendingN()+' pending';$('#ap').innerHTML='<div class="list">'+APPR.map(a=>'<div class="row" style="flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>'+esc(a.title)+'</b><div class="tiny mut">'+esc(a.agent)+' · '+esc(a.val)+'</div><div class="tiny" style="margin-top:4px">Why: '+esc(a.why)+'</div></div><div style="text-align:right">'+pillA(a.st)+(a.st==='Pending'?'<div style="margin-top:6px;display:flex;gap:6px"><button class="btn gold sm" data-ap="'+a.id+'">Approve</button><button class="btn line sm" data-rj="'+a.id+'">Reject</button></div>':'')+'</div></div>').join('')+'</div>';
+    document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>{APPR.find(x=>x.id===b.dataset.ap).st='Approved';ap();toast('Approved and logged')});
+    document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=()=>{APPR.find(x=>x.id===b.dataset.rj).st='Rejected';ap();toast('Rejected and logged')})};
+  ag();ap();
+  const R={late:g=>'I have requested a 3 pm late checkout for tomorrow. As a '+g.tier+' member there is no charge, and I will confirm as soon as housekeeping signs off.',table:g=>'I am arranging a table for six tonight and have noted your preference: '+g.pref.split(',')[0].toLowerCase()+'. I will confirm the time shortly.',spa:g=>'The spa has openings this evening at 6 pm and 8 pm. I can reserve either for you, and I have noted your preference: '+(g.pref.toLowerCase().includes('spa')?'spa evenings':'a quiet treatment room')+'.',issue:g=>'I am sorry about the noise. Engineering will visit within 30 minutes, and if it is not resolved I will move you to an equivalent room with a view of your choice.',transfer:g=>'I can arrange a private airport transfer. Could you share your flight number and arrival time? I will have a driver waiting.'};
+  const A={late:['Create late-checkout request','Notify housekeeping'],table:['Book restaurant table','Flag preferences to host'],spa:['Hold spa slot','Add to itinerary'],issue:['Open maintenance ticket','Pre-approve room move'],transfer:['Request flight details','Book chauffeur']};
+  $('#cd').onclick=()=>{const g=GUESTS.find(x=>x.id===$('#cg').value),k=$('#cm').value,tone=$('#ct').value,first=g.name.split(' ')[0],o=$('#co'),a=$('#ca');
+    const open=tone==='Formal'?'Dear '+g.name.replace(' (demo)','')+',':tone==='Brief'?'Hi '+first+',':'Dear '+first+', thank you for reaching out.';
+    const txt=open+'\n\n'+(tone==='Brief'?R[k](g).split('. ')[0]+'.':R[k](g))+'\n\n'+(tone==='Formal'?'Yours sincerely,':'Warm regards,')+'\nGuest Relations';
+    o.style.display='block';o.innerHTML='<span class="typing"><i></i><i></i><i></i></span>';a.style.display='none';
+    setTimeout(()=>{o.textContent='';let i=0;(function t(){o.textContent=txt.slice(0,i+=4);if(i<txt.length)setTimeout(t,14);else{a.style.display='block';a.innerHTML='<div class="tiny mut" style="margin-bottom:6px">Suggested actions</div>'+A[k].map(x=>'<span class="pill gold" style="margin-right:6px">'+x+'</span>').join('')+'<div style="margin-top:10px"><button class="btn gold sm" id="csend">Send (simulated)</button></div>';$('#csend').onclick=()=>toast('Simulated: reply queued for '+first)}})()},800)}};
+
+PAGES.price=()=>pageHead('Dynamic Pricing','Rate suggestions from demand, competitor moves and events. A rule-based illustration, not a trained forecast.','')+
+ '<div class="grid g21"><div class="card"><h3>Recommended rates, next 14 days</h3><div class="chart"><canvas id="pr1"></canvas></div></div>'+
+ '<div class="card"><h3>Scenario</h3><div class="form" style="grid-template-columns:1fr"><div><label for="pp">Property</label><select id="pp">'+PROPS.map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('')+'</select></div><div><label for="pd">Forecast demand: <b id="pdv"></b>%</label><input id="pd" class="sl" type="range" min="55" max="95" value="80"></div><div><label for="pc">Competitor rate change: <b id="pcv"></b>%</label><input id="pc" class="sl" type="range" min="-15" max="15" value="4"></div><label style="display:flex;gap:8px;color:var(--fg)"><input type="checkbox" id="pe" style="width:auto"> Major event nearby (days 4 to 7)</label></div></div></div>'+
+ '<div class="grid g6" id="pk" style="margin-top:16px"></div><div class="card" style="margin-top:16px"><button class="btn gold" id="psend">Send recommendation for approval</button><p class="tiny mut" style="margin:10px 0 0">Model: rate = current ADR × (1 + 0.6% per occupancy point above 75% + half of competitor change + 8% event uplift), rounded to SAR 5. Weekend nights add 6 points of demand.</p></div>';
+PAGES.price.mount=()=>{
+  let last=null;
+  const draw=()=>{const p=PROPS.find(x=>x.id===$('#pp').value),d=+$('#pd').value,c=+$('#pc').value,ev=$('#pe').checked;$('#pdv').textContent=d;$('#pcv').textContent=(c>0?'+':'')+c;
+    const rec=[],occ=[],lab=[];for(let i=0;i<14;i++){const dt=new Date(2026,10,18+i),dow=dt.getDay(),wk=(dow===4||dow===5)?6:0,o=Math.max(40,Math.min(99,d+wk+Math.round(Math.sin(i*1.3)*3))),f=1+(o-75)*.006+c/100*.5+(ev&&i>=3&&i<=6?.08:0);rec.push(Math.round(p.adr*f/5)*5);occ.push(o);lab.push(dt.toLocaleString('en',{day:'numeric',month:'short'}))}
+    const avg=rec.reduce((a,b)=>a+b,0)/14,chg=(avg/p.adr-1)*100,extra=rec.reduce((a,r,i)=>a+(r-p.adr)*p.rooms*occ[i]/100,0)/1000;last={p,chg,extra};
+    $('#pk').innerHTML=[['Current ADR','SAR '+p.adr],['Average recommended','SAR '+Math.round(avg)],['Change',(chg>=0?'+':'')+chg.toFixed(1)+'%'],['Extra revenue, 14 days',(extra>=0?'+':'')+'SAR '+Math.round(extra)+'K']].map(x=>'<div class="card kpi"><div class="mut tiny">'+x[0]+'</div><div class="v" style="font-size:26px">'+x[1]+'</div></div>').join('');
+    charts.forEach(x=>x.destroy());charts=[];mk('pr1',{type:'line',zero:false,data:{labels:lab,datasets:[{label:'Recommended ADR (SAR)',data:rec,borderColor:gold(),backgroundColor:'rgba(201,169,97,.15)',fill:true,tension:.3,pointRadius:3},{label:'Current ADR',data:rec.map(()=>p.adr),borderColor:css('--mut'),borderDash:[6,4],pointRadius:0}]}})};
+  ['pp','pd','pc','pe'].forEach(i=>$('#'+i).addEventListener('input',draw));draw();
+  $('#psend').onclick=()=>{APPR.unshift({id:'a'+Date.now(),agent:'Revenue Agent',title:(last.chg>=0?'Raise':'Lower')+' '+last.p.name+' rates by '+Math.abs(last.chg).toFixed(1)+'% (14-day average)',val:(last.extra>=0?'+':'')+'SAR '+Math.round(last.extra)+'K',why:'Created from the pricing scenario on this page.',st:'Pending'});toast('Sent to the approvals inbox')}};
+
+function cmdk(){const items=NAV.map(n=>[n[1],'Go to page',()=>go(n[0])]).concat([['Open approvals inbox','Action',()=>go('agents')],['Create an automation','Action',()=>go('auto')],['Switch theme','Action',()=>$('#theme').click()]]);
+  openModal('Quick navigation','<input id="cmdq" class="cmd" placeholder="Type a page or action…" aria-label="Quick navigation"><div id="cmdl"></div>',()=>{
+    const draw=()=>{const q=$('#cmdq').value.toLowerCase(),L=items.filter(i=>i[0].toLowerCase().includes(q));$('#cmdl').innerHTML=L.map((it,n)=>'<button class="cmdi" data-n="'+n+'"><span>'+it[0]+'</span><span class="mut tiny">'+it[1]+'</span></button>').join('')||'<p class="mut">No match</p>';
+      document.querySelectorAll('.cmdi').forEach(b=>b.onclick=()=>{closeModal();L[+b.dataset.n][2]()});return L};
+    let L=draw();$('#cmdq').oninput=()=>{L=draw()};$('#cmdq').onkeydown=e=>{if(e.key==='Enter'&&L[0]){closeModal();L[0][2]()}};$('#cmdq').focus()})}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&$('#app').style.display==='block'){e.preventDefault();cmdk()}});
+document.addEventListener('DOMContentLoaded',()=>{});
+
+/* ---------- shell ---------- */
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);charts.forEach(c=>c.destroy());charts=[];go(cur,true)}
+function go(p,keep){if(!PAGES[p])p='exec';cur=p;const m=$('#main');charts.forEach(c=>c.destroy());charts=[];
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));
+  $('#side').classList.remove('open');$('#scrim').classList.remove('open');
+  if(!keep)history.replaceState(null,'','#'+p);
+  m.style.animation='none';m.innerHTML='<div class="skel"></div><div class="skel" style="height:260px"></div>';
+  setTimeout(()=>{m.style.animation='';m.innerHTML=PAGES[p]();PAGES[p].mount&&PAGES[p].mount();countUp();bars();window.scrollTo(0,0)},keep?0:260)}
+$('#nav').innerHTML=NAV.map(n=>'<button data-p="'+n[0]+'"><svg viewBox="0 0 24 24"><path d="'+n[2]+'"/></svg>'+n[1]+'</button>').join('');
+$('#nav').onclick=e=>{const b=e.target.closest('button');if(b)go(b.dataset.p)};
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)go(g.dataset.go);
+  const pr=e.target.closest('[data-prop]');if(pr)propModal(pr.dataset.prop);
+  const pj=e.target.closest('[data-proj]');if(pj)projModal(pj.dataset.proj);
+  if(!e.target.closest('#panel')&&!e.target.closest('#bell'))$('#panel').classList.remove('open');
+  if(!e.target.closest('.search'))$('#sres').style.display='none'});
+$('#burger').onclick=()=>{$('#side').classList.add('open');$('#scrim').classList.add('open')};$('#scrim').onclick=()=>{$('#side').classList.remove('open');$('#scrim').classList.remove('open')};
+$('#theme').onclick=()=>{const dark=document.documentElement.getAttribute('data-theme')==='dark'||(!document.documentElement.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);setTheme(dark?'light':'dark')};
+$('#bell').onclick=()=>{const p=$('#panel');p.innerHTML='<div class="item"><b>Notifications</b></div>'+['Lamb shoulder below reorder level|F&B','Demo National Day Brunch starts tomorrow|Events','Abha staffing gap: 14 roles|Operations','New 5★ review at Demo Desert Retreat AlUla|Guest'].map(x=>'<div class="item">'+x.split('|')[0]+'<div class="tiny mut">'+x.split('|')[1]+'</div></div>').join('')+'<div class="item"><button class="btn line sm" id="mark">Mark all read</button></div>';p.classList.toggle('open');
+  const mk2=$('#mark');if(mk2)mk2.onclick=()=>{$('#bdot').style.display='none';p.classList.remove('open');toast('All notifications read')}};
+$('#gs').oninput=e=>{const q=e.target.value.trim().toLowerCase(),r=$('#sres');if(!q){r.style.display='none';return}
+  const hits=[].concat(PROPS.map(p=>['Property',p.name,()=>propModal(p.id)]),REST.map(x=>['Restaurant',x.name,()=>go('fnb')]),GUESTS.map(g=>['Guest',g.name,()=>guestModal(g.id)]),EVENTS.map(x=>['Event',x.name,()=>eventModal(x.id)]),PROJ.map(x=>['Project',x.name,()=>projModal(x.id)])).filter(h=>h[1].toLowerCase().includes(q)).slice(0,8);
+  r.innerHTML=hits.length?'':'<div style="padding:12px" class="mut">No results</div>';hits.forEach(h=>{const b=document.createElement('button');b.innerHTML='<span class="tiny mut">'+h[0]+'</span><br>'+esc(h[1]);b.onclick=()=>{r.style.display='none';e.target.value='';h[2]()};r.appendChild(b)});r.style.display='block'};
+function tick(){$('#clock').textContent=new Date().toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+setInterval(tick,30000);tick();
+$('#loginform').onsubmit=e=>{e.preventDefault();$('#login').style.display='none';
+  let seen=false;try{seen=sessionStorage.getItem('ahk-seen')==='1'}catch(x){}
+  const open=()=>{$('#onboard').style.display='none';$('#app').style.display='block';const h=location.hash.slice(1);go(PAGES[h]?h:'exec',true)};
+  if(seen){open();return}
+  $('#onboard').style.display='grid';setTimeout(()=>{try{sessionStorage.setItem('ahk-seen','1')}catch(x){}open()},matchMedia('(prefers-reduced-motion:reduce)').matches?200:2300)};
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if($('#app').style.display==='block'&&PAGES[h]&&h!==cur)go(h,true)});
+</script>
+
+</body>
+</html>
